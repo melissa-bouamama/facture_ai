@@ -1,0 +1,63 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "factur-ia"
+version = "0.1.0"
+description = "Transforme des factures PDF (natives ou scannées) en Factur-X conformes EN 16931, avec contrôle des mentions obligatoires de la réforme française 2026."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "Melissa Bouamama" }]
+keywords = ["factur-x", "e-invoicing", "en16931", "document-ai", "llm", "ocr", "information-extraction"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Natural Language :: French",
+  "Topic :: Office/Business :: Financial :: Accounting",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+  "pydantic>=2.6",
+  "pdfplumber>=0.11",
+  "lxml>=5.0",
+  "factur-x>=3.0",
+  "httpx>=0.27",
+  "typer>=0.12",
+  "rich>=13.0",
+]
+
+[project.optional-dependencies]
+ocr = ["pytesseract>=0.3.10", "pillow>=10.0", "numpy>=1.26"]
+api = ["fastapi>=0.110", "uvicorn>=0.29", "python-multipart>=0.0.9"]
+schematron = ["saxonche>=12.4"]
+bench = ["reportlab>=4.0", "pillow>=10.0", "numpy>=1.26"]
+dev = [
+  "factur-ia[ocr,api,schematron,bench]",
+  "pytest>=8.0",
+  "ruff>=0.5",
+]
+
+[project.scripts]
+facturia = "facturia.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/melissa-bouamama/factur-ia"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/facturia"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "bench", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501", "B008"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = ["slow: tests qui génèrent des PDF ou lancent l'OCR"]
