@@ -1,0 +1,205 @@
+{
+  "file": "facture_a_corriger.pdf",
+  "source": "native",
+  "backend": "rules",
+  "invoice": {
+    "number": "FA-2026-7493",
+    "type_code": "380",
+    "issue_date": "2026-09-01",
+    "due_date": "2026-10-01",
+    "currency": "EUR",
+    "seller": {
+      "name": "Iroline Ingénierie SASU",
+      "siren": "893287920",
+      "siret": "89328792000977",
+      "vat_id": "FR55893287920",
+      "address": {
+        "line1": "78 avenue Victor Hugo",
+        "line2": null,
+        "postcode": "35000",
+        "city": "Rennes",
+        "country_code": "FR"
+      },
+      "email": null
+    },
+    "buyer": {
+      "name": "Novabat Studio SAS",
+      "siren": null,
+      "siret": null,
+      "vat_id": null,
+      "address": {
+        "line1": "10 avenue Jean Jaurès",
+        "line2": null,
+        "postcode": "75011",
+        "city": "Paris",
+        "country_code": "FR"
+      },
+      "email": null
+    },
+    "delivery_address": null,
+    "operation_category": null,
+    "vat_on_debits": true,
+    "lines": [
+      {
+        "description": "Abonnement hébergement mensuel",
+        "quantity": "1",
+        "unit_price": "49.00",
+        "net_amount": "49.00",
+        "vat_rate": "2E+1",
+        "unit_code": "C62"
+      },
+      {
+        "description": "Rédaction de documentation",
+        "quantity": "10",
+        "unit_price": "450.00",
+        "net_amount": "4500.00",
+        "vat_rate": "2E+1",
+        "unit_code": "C62"
+      },
+      {
+        "description": "Formation Python - 2 jours",
+        "quantity": "2",
+        "unit_price": "1400.00",
+        "net_amount": "2800.00",
+        "vat_rate": "2E+1",
+        "unit_code": "C62"
+      },
+      {
+        "description": "Audit de sécurité",
+        "quantity": "3",
+        "unit_price": "2500.00",
+        "net_amount": "7500.00",
+        "vat_rate": "2E+1",
+        "unit_code": "C62"
+      }
+    ],
+    "vat_breakdown": [
+      {
+        "rate": "2E+1",
+        "taxable_amount": "14849.00",
+        "tax_amount": "2969.80",
+        "category": "S"
+      }
+    ],
+    "total_without_vat": "14849.00",
+    "total_vat": "2969.80",
+    "total_with_vat": "17818.80",
+    "amount_due": "17818.80",
+    "iban": "FR7610974092149161461003379",
+    "bic": "BNPAFRPPXXX",
+    "payment_terms": "Virement bancaire",
+    "late_penalty_note": "En cas de retard de paiement, des pénalités au taux de 3 fois le taux d'intérêt légal seront appliquées.",
+    "recovery_fee_note": "Indemnité forfaitaire pour frais de recouvrement : 40 €.",
+    "discount_note": "Pas d'escompte pour paiement anticipé."
+  },
+  "confidence": {
+    "number": {
+      "value": 0.95,
+      "source": "rules:label-same"
+    },
+    "due_date": {
+      "value": 0.9,
+      "source": "rules:label-same"
+    },
+    "issue_date": {
+      "value": 0.9,
+      "source": "rules:label-same"
+    },
+    "buyer.name": {
+      "value": 0.9,
+      "source": "rules:block"
+    },
+    "seller.name": {
+      "value": 0.97,
+      "source": "rules:top-block+footer"
+    },
+    "seller.vat_id": {
+      "value": 0.95,
+      "source": "rules:checksum"
+    },
+    "seller.siren": {
+      "value": 0.97,
+      "source": "rules:checksum+agree"
+    },
+    "lines": {
+      "value": 0.95,
+      "source": "rules:table+arith"
+    },
+    "total_without_vat": {
+      "value": 0.95,
+      "source": "rules:label+balanced"
+    },
+    "total_vat": {
+      "value": 0.95,
+      "source": "rules:label-rates+balanced"
+    },
+    "total_with_vat": {
+      "value": 0.95,
+      "source": "rules:label+balanced"
+    },
+    "iban": {
+      "value": 0.97,
+      "source": "rules:mod97"
+    }
+  },
+  "mean_confidence": 0.943,
+  "issues": [
+    {
+      "code": "FR-BUYER-SIREN-MISSING",
+      "severity": "error",
+      "message": "SIREN du client absent : nouvelle mention obligatoire pour les factures B2B domestiques.",
+      "field": "buyer.siren",
+      "bt": "BT-47",
+      "rule": "BR-FR-11",
+      "fine_eur": "15",
+      "suggestion": null
+    },
+    {
+      "code": "FR-OPERATION-CATEGORY-MISSING",
+      "severity": "error",
+      "message": "Catégorie d'opération absente (livraison de biens, prestation de services ou mixte).",
+      "field": "operation_category",
+      "bt": "BT-23",
+      "rule": "BR-FR-08",
+      "fine_eur": "15",
+      "suggestion": "PS — Prestation de services"
+    }
+  ],
+  "fine_exposure_eur": "30.00",
+  "decision": "fix_required",
+  "decision_reasons": [
+    "2 anomalie(s) bloquante(s) : FR-BUYER-SIREN-MISSING, FR-OPERATION-CATEGORY-MISSING"
+  ],
+  "xml_valid": false,
+  "xml_failures": [
+    {
+      "schematron": "en16931",
+      "id": "PEPPOL-EN16931-R008",
+      "flag": "warning",
+      "location": "/*:CrossIndustryInvoice[namespace-uri()='urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100'][1]/*:SupplyChainTradeTransaction[namespace-uri()='urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100'][1]/*:ApplicableHeaderTradeDelivery[namespace-uri()='urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100'][1]",
+      "message": "[PEPPOL-EN16931-R008]-Document MUST not contain empty elements. (still status warning)"
+    },
+    {
+      "schematron": "br-fr",
+      "id": "BR-FR-08_BT-23",
+      "flag": "fatal",
+      "location": "/*:CrossIndustryInvoice[namespace-uri()='urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100'][1]/*:ExchangedDocumentContext[namespace-uri()='urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100'][1]",
+      "message": "BR-FR-08/BT-23 : La valeur du mode de facturation (ram:ID) est absente ou n’est pas autorisée. Valeurs acceptées : B1, S1, M1, B2, S2, M2, S3, B4, S4, M4, S5, S6, B7, S7, B8, S8, M8, B9, S9, M9. Valeur actuelle : \"\". Veuillez utiliser une valeur conforme à la liste des modes de facturation autorisés."
+    },
+    {
+      "schematron": "br-fr",
+      "id": "BR-FR-12_BT-49",
+      "flag": "fatal",
+      "location": "/*:CrossIndustryInvoice[namespace-uri()='urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100'][1]",
+      "message": "BR-FR-12/BT-49 : Le BT-49 est obligatoire. Valeur actuelle : BT-49=\"\"."
+    }
+  ],
+  "notes": [],
+  "timings_ms": {
+    "read": 35.1,
+    "extract": 2.7,
+    "validate": 0.1,
+    "export": 561.0,
+    "total": 599.0
+  }
+}

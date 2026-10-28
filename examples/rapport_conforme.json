@@ -1,0 +1,191 @@
+{
+  "file": "facture_conforme.pdf",
+  "source": "native",
+  "backend": "rules",
+  "invoice": {
+    "number": "F2026/1689",
+    "type_code": "380",
+    "issue_date": "2026-10-06",
+    "due_date": "2026-11-05",
+    "currency": "EUR",
+    "seller": {
+      "name": "Doranova Informatique SAS",
+      "siren": "181591835",
+      "siret": "18159183500390",
+      "vat_id": "FR43181591835",
+      "address": {
+        "line1": "112 allée Victor Hugo",
+        "line2": null,
+        "postcode": "69003",
+        "city": "Lyon",
+        "country_code": "FR"
+      },
+      "email": null
+    },
+    "buyer": {
+      "name": "Lumitek Logistique SASU",
+      "siren": "191390996",
+      "siret": null,
+      "vat_id": null,
+      "address": {
+        "line1": "57 rue de la Gare",
+        "line2": null,
+        "postcode": "75011",
+        "city": "Paris",
+        "country_code": "FR"
+      },
+      "email": null
+    },
+    "delivery_address": null,
+    "operation_category": "LBPS",
+    "vat_on_debits": false,
+    "lines": [
+      {
+        "description": "Développement logiciel (jour/homme)",
+        "quantity": "1",
+        "unit_price": "620.00",
+        "net_amount": "620.00",
+        "vat_rate": "2E+1",
+        "unit_code": "C62"
+      },
+      {
+        "description": "Cartouche toner noir",
+        "quantity": "5",
+        "unit_price": "64.00",
+        "net_amount": "320.00",
+        "vat_rate": "2E+1",
+        "unit_code": "C62"
+      },
+      {
+        "description": "Abonnement hébergement mensuel",
+        "quantity": "2",
+        "unit_price": "49.00",
+        "net_amount": "98.00",
+        "vat_rate": "2E+1",
+        "unit_code": "C62"
+      }
+    ],
+    "vat_breakdown": [
+      {
+        "rate": "2E+1",
+        "taxable_amount": "1038.00",
+        "tax_amount": "207.60",
+        "category": "S"
+      }
+    ],
+    "total_without_vat": "1038.00",
+    "total_vat": "207.60",
+    "total_with_vat": "1245.60",
+    "amount_due": "1245.60",
+    "iban": "FR7625256767607543231948721",
+    "bic": "CEPAFRPP751",
+    "payment_terms": "Paiement par virement à réception",
+    "late_penalty_note": "En cas de retard de paiement, des pénalités au taux de 3 fois le taux d'intérêt légal seront appliquées.",
+    "recovery_fee_note": "Indemnité forfaitaire pour frais de recouvrement : 40 €.",
+    "discount_note": "Pas d'escompte pour paiement anticipé."
+  },
+  "confidence": {
+    "number": {
+      "value": 0.9,
+      "source": "rules:label-right"
+    },
+    "due_date": {
+      "value": 0.9,
+      "source": "rules:label-right"
+    },
+    "issue_date": {
+      "value": 0.9,
+      "source": "rules:label-right"
+    },
+    "buyer.name": {
+      "value": 0.9,
+      "source": "rules:block"
+    },
+    "seller.name": {
+      "value": 0.97,
+      "source": "rules:top-block+footer"
+    },
+    "buyer.siren": {
+      "value": 0.95,
+      "source": "rules:checksum"
+    },
+    "seller.vat_id": {
+      "value": 0.95,
+      "source": "rules:checksum"
+    },
+    "seller.siren": {
+      "value": 0.97,
+      "source": "rules:checksum+agree"
+    },
+    "lines": {
+      "value": 0.95,
+      "source": "rules:table+arith"
+    },
+    "total_without_vat": {
+      "value": 0.95,
+      "source": "rules:label+balanced"
+    },
+    "total_vat": {
+      "value": 0.95,
+      "source": "rules:label-rates+balanced"
+    },
+    "total_with_vat": {
+      "value": 0.95,
+      "source": "rules:label+balanced"
+    },
+    "iban": {
+      "value": 0.97,
+      "source": "rules:mod97"
+    },
+    "operation_category": {
+      "value": 0.95,
+      "source": "rules:label"
+    }
+  },
+  "mean_confidence": 0.938,
+  "issues": [
+    {
+      "code": "FR-DELIVERY-ADDRESS-CHECK",
+      "severity": "info",
+      "message": "Livraison de biens sans adresse de livraison : obligatoire si elle diffère de l'adresse de facturation.",
+      "field": "delivery_address",
+      "bt": "BG-15",
+      "rule": null,
+      "fine_eur": null,
+      "suggestion": null
+    },
+    {
+      "code": "FR-VAT-DEBITS-CHECK",
+      "severity": "info",
+      "message": "Si le vendeur a opté pour le paiement de la TVA d'après les débits, la mention doit figurer sur la facture.",
+      "field": "vat_on_debits",
+      "bt": "BT-8",
+      "rule": null,
+      "fine_eur": null,
+      "suggestion": null
+    }
+  ],
+  "fine_exposure_eur": "0.00",
+  "decision": "ready",
+  "decision_reasons": [
+    "extraction sûre, aucune anomalie bloquante"
+  ],
+  "xml_valid": true,
+  "xml_failures": [
+    {
+      "schematron": "en16931",
+      "id": "PEPPOL-EN16931-R008",
+      "flag": "warning",
+      "location": "/*:CrossIndustryInvoice[namespace-uri()='urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100'][1]/*:SupplyChainTradeTransaction[namespace-uri()='urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100'][1]/*:ApplicableHeaderTradeDelivery[namespace-uri()='urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100'][1]",
+      "message": "[PEPPOL-EN16931-R008]-Document MUST not contain empty elements. (still status warning)"
+    }
+  ],
+  "notes": [],
+  "timings_ms": {
+    "read": 30.6,
+    "extract": 7.0,
+    "validate": 0.2,
+    "export": 715.4,
+    "total": 761.5
+  }
+}

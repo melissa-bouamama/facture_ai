@@ -1,0 +1,201 @@
+{
+  "file": "facture_scannee.pdf",
+  "source": "ocr",
+  "backend": "rules",
+  "invoice": {
+    "number": "2026-10-2681",
+    "type_code": "380",
+    "issue_date": "2026-10-08",
+    "due_date": "2026-11-22",
+    "currency": "EUR",
+    "seller": {
+      "name": "Célitek Conseil EURL",
+      "siren": "466852340",
+      "siret": "46685234004566",
+      "vat_id": "FR28466852340",
+      "address": {
+        "line1": "57 impasse Gambetta",
+        "line2": null,
+        "postcode": "75011",
+        "city": "Paris",
+        "country_code": "FR"
+      },
+      "email": null
+    },
+    "buyer": {
+      "name": "Nexatek Solutions SASU",
+      "siren": "618650303",
+      "siret": null,
+      "vat_id": "FR63618650303",
+      "address": {
+        "line1": "169 avenue Saint-Michel",
+        "line2": null,
+        "postcode": "59000",
+        "city": "Lille",
+        "country_code": "FR"
+      },
+      "email": null
+    },
+    "delivery_address": {
+      "line1": "72 quai Saint-Michel",
+      "line2": null,
+      "postcode": "34000",
+      "city": "Montpellier",
+      "country_code": "FR"
+    },
+    "operation_category": "LB",
+    "vat_on_debits": false,
+    "lines": [
+      {
+        "description": "Chaise de bureau ergonomique",
+        "quantity": "1",
+        "unit_price": "349.00",
+        "net_amount": "349.00",
+        "vat_rate": "2E+1",
+        "unit_code": "C62"
+      },
+      {
+        "description": "Disque SSD 1 To",
+        "quantity": "12",
+        "unit_price": "79.90",
+        "net_amount": "958.80",
+        "vat_rate": "2E+1",
+        "unit_code": "C62"
+      },
+      {
+        "description": "Plateaux repas (lot de 12)",
+        "quantity": "3",
+        "unit_price": "96.00",
+        "net_amount": "288.00",
+        "vat_rate": "1E+1",
+        "unit_code": "C62"
+      },
+      {
+        "description": "Cartouche toner noir",
+        "quantity": "1",
+        "unit_price": "64.00",
+        "net_amount": "64.00",
+        "vat_rate": "2E+1",
+        "unit_code": "C62"
+      },
+      {
+        "description": "Station d'accueil USB-C",
+        "quantity": "10",
+        "unit_price": "129.00",
+        "net_amount": "1290.00",
+        "vat_rate": "2E+1",
+        "unit_code": "C62"
+      },
+      {
+        "description": "Lot de 10 cahiers",
+        "quantity": "3",
+        "unit_price": "15.00",
+        "net_amount": "45.00",
+        "vat_rate": "2E+1",
+        "unit_code": "C62"
+      }
+    ],
+    "vat_breakdown": [
+      {
+        "rate": "2E+1",
+        "taxable_amount": "2706.80",
+        "tax_amount": "541.36",
+        "category": "S"
+      },
+      {
+        "rate": "1E+1",
+        "taxable_amount": "288.00",
+        "tax_amount": "28.80",
+        "category": "S"
+      }
+    ],
+    "total_without_vat": "2994.80",
+    "total_vat": "570.16",
+    "total_with_vat": "3564.96",
+    "amount_due": "3564.96",
+    "iban": "FR7620839143025484783421936",
+    "bic": "BNPAFRPPXXX",
+    "payment_terms": "Paiement par virement à réception",
+    "late_penalty_note": "En cas de retard de paiement, des pénalités au taux de 3 fois le taux d'intérêt légal seront appliquées.",
+    "recovery_fee_note": "Indernnité forfaitaire pour frais de recouvrement : 40 €.",
+    "discount_note": "Pas d'escompte pour paiement anticipé."
+  },
+  "confidence": {
+    "number": {
+      "value": 0.888,
+      "source": "rules:label-same"
+    },
+    "due_date": {
+      "value": 0.842,
+      "source": "rules:label-same"
+    },
+    "issue_date": {
+      "value": 0.842,
+      "source": "rules:label-same"
+    },
+    "buyer.name": {
+      "value": 0.81,
+      "source": "rules:block"
+    },
+    "seller.name": {
+      "value": 0.907,
+      "source": "rules:top-block+footer"
+    },
+    "buyer.siren": {
+      "value": 0.888,
+      "source": "rules:checksum"
+    },
+    "buyer.vat_id": {
+      "value": 0.888,
+      "source": "rules:checksum"
+    },
+    "seller.vat_id": {
+      "value": 0.888,
+      "source": "rules:checksum"
+    },
+    "seller.siren": {
+      "value": 0.907,
+      "source": "rules:checksum+agree"
+    },
+    "lines": {
+      "value": 0.888,
+      "source": "rules:table+arith"
+    },
+    "total_without_vat": {
+      "value": 0.892,
+      "source": "rules:label+balanced"
+    },
+    "total_vat": {
+      "value": 0.892,
+      "source": "rules:label-rates+balanced"
+    },
+    "total_with_vat": {
+      "value": 0.892,
+      "source": "rules:label+balanced"
+    },
+    "iban": {
+      "value": 0.907,
+      "source": "rules:mod97"
+    },
+    "operation_category": {
+      "value": 0.888,
+      "source": "rules:label"
+    }
+  },
+  "mean_confidence": 0.88,
+  "issues": [],
+  "fine_exposure_eur": "0.00",
+  "decision": "ready",
+  "decision_reasons": [
+    "extraction sûre, aucune anomalie bloquante"
+  ],
+  "xml_valid": null,
+  "xml_failures": [],
+  "notes": [],
+  "timings_ms": {
+    "read": 2423.9,
+    "extract": 5.7,
+    "validate": 0.2,
+    "total": 2429.8
+  }
+}
