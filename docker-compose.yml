@@ -1,0 +1,22 @@
+# API + LLM local (Ollama) : les factures ne quittent pas la machine.
+#   docker compose up -d
+#   docker compose exec ollama ollama pull qwen2.5:7b-instruct
+#   curl -F file=@facture.pdf "http://localhost:8000/v1/analyze?backend=hybrid"
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      FACTURIA_LLM_BASE_URL: http://ollama:11434/v1
+      FACTURIA_LLM_MODEL: qwen2.5:7b-instruct
+    depends_on:
+      - ollama
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama:/root/.ollama
+
+volumes:
+  ollama:
