@@ -1,5 +1,5 @@
 {
-  "file": "facture_scannee.pdf",
+  "file": "scan.pdf",
   "source": "ocr",
   "backend": "rules",
   "invoice": {
@@ -187,15 +187,16 @@
   "fine_exposure_eur": "0.00",
   "decision": "ready",
   "decision_reasons": [
-    "extraction sûre, aucune anomalie bloquante"
+    "Lecture sûre et aucune anomalie bloquante."
   ],
   "xml_valid": null,
   "xml_failures": [],
+  "schematrons_run": [],
   "notes": [],
   "timings_ms": {
-    "read": 2423.9,
-    "extract": 5.7,
+    "read": 2538.8,
+    "extract": 9.8,
     "validate": 0.2,
-    "total": 2429.8
+    "total": 2548.8
   }
 }

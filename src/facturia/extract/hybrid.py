@@ -2,9 +2,9 @@
 
 Le coût d'un LLM n'est justifié que sur les factures difficiles. On lance donc
 l'extracteur à règles (≈ quelques ms), puis on décide d'escalader si :
-- un champ indispensable manque ou a une confiance faible ;
+- un champ indispensable manque ou a une confiance faible,
 - l'arithmétique ne tombe pas juste (HT + TVA ≠ TTC, somme des lignes ≠ HT…),
-  signe probable d'une erreur de lecture plutôt que d'une facture fausse ;
+  signe probable d'une erreur de lecture plutôt que d'une facture fausse,
 - (option) une mention obligatoire semble absente : on demande une seconde lecture
   avant d'accuser la facture d'être non conforme.
 
@@ -20,7 +20,7 @@ from ..models import Invoice
 from ..normalize import money
 from ..reader import Document
 from ..validate import validate
-from .base import CORE_FIELDS, Extraction
+from .base import CORE_FIELDS, Extraction, label
 from .llm import LLMExtractor
 from .rules import RulesExtractor
 
@@ -40,14 +40,39 @@ SIMPLE_FIELDS = ["number", "issue_date", "due_date", "iban", "bic", "operation_c
 PARTY_FIELDS = ["name", "siren", "siret", "vat_id"]
 
 
+MENTION_LABELS = {
+    "FR-BUYER-SIREN-MISSING": "SIREN du client",
+    "FR-OPERATION-CATEGORY-MISSING": "catégorie d'opération",
+    "FR-NOTE-PENALTIES-MISSING": "pénalités de retard",
+    "FR-NOTE-RECOVERY-FEE-MISSING": "indemnité de 40 €",
+    "FR-NOTE-DISCOUNT-MISSING": "conditions d'escompte",
+}
+ARITH_LABELS = {
+    "TOTALS-UNBALANCED": "HT plus TVA différent du TTC",
+    "LINES-SUM-MISMATCH": "somme des lignes différente du total HT",
+    "VAT-BREAKDOWN-MISMATCH": "TVA par taux différente du total",
+    "CORE-TOTALS-MISSING": "totaux absents",
+    "CORE-NO-LINES": "aucune ligne lue",
+}
+
+
 def escalation_reasons(
     ex: Extraction, check_mentions: bool = True, threshold: float = 0.75
 ) -> list[str]:
-    reasons = [f"confiance faible : {f}" for f in CORE_FIELDS if ex.score(f) < threshold]
+    weak = [label(f) for f in CORE_FIELDS if ex.score(f) < threshold]
     codes = {i.code for i in validate(ex.invoice)}
-    reasons += [f"incohérence : {c}" for c in sorted(codes & ARITH_CODES)]
+    reasons = []
+    if weak:
+        reasons.append("lecture peu sûre : " + ", ".join(weak))
+    arith = sorted(codes & ARITH_CODES)
+    if arith:
+        reasons.append("montants incohérents : " + ", ".join(ARITH_LABELS[c] for c in arith))
     if check_mentions:
-        reasons += [f"mention à confirmer : {c}" for c in sorted(codes & MENTION_CODES)]
+        mentions = sorted(codes & MENTION_CODES)
+        if mentions:
+            reasons.append(
+                "mentions à confirmer : " + ", ".join(MENTION_LABELS[c] for c in mentions)
+            )
     return reasons
 
 
@@ -124,16 +149,18 @@ class HybridExtractor:
         if not reasons:
             first.backend = "hybrid:rules-only"
             return first
-        log.info("escalade vers le LLM : %s", "; ".join(reasons))
+        log.info("escalade vers le LLM : %s", ". ".join(reasons))
         try:
             second = self.llm.extract(doc)
             self.llm_calls += 1
         except Exception as exc:  # le LLM est un bonus, jamais un point de rupture
             first.notes.append(
-                f"LLM indisponible ({type(exc).__name__}) : résultat des règles conservé"
+                f"LLM indisponible ({type(exc).__name__}), résultat des règles conservé."
             )
             first.backend = "hybrid:rules-fallback"
             return first
         merged = merge(first, second)
-        merged.notes.append("escalade LLM : " + "; ".join(reasons))
+        merged.notes.append(
+            "Appel au LLM. " + ". ".join(r[0].upper() + r[1:] for r in reasons) + "."
+        )
         return merged

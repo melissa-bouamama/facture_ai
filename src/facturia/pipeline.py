@@ -1,10 +1,10 @@
-"""Pipeline complet : PDF → lecture/OCR → extraction → validation → décision → Factur-X.
+"""Pipeline complet : PDF, lecture ou OCR, extraction, validation, décision, Factur-X.
 
 La décision finale sert à router chaque facture :
-- `ready` : extraction sûre et facture conforme, transmissible à la plateforme agréée ;
-- `fix_required` : extraction sûre mais mentions manquantes ou montants faux — il faut
-  corriger la facture chez l'émetteur (les anomalies disent quoi et où) ;
-- `human_review` : doute sur la lecture elle-même (confiance faible, ou incohérence
+- prête : extraction sûre et facture conforme, transmissible à la plateforme agréée.
+- à corriger : extraction sûre mais mentions manquantes ou montants faux. Il faut
+  corriger la facture chez l'émetteur, et les anomalies disent quoi et où.
+- revue humaine : doute sur la lecture elle même (confiance faible, ou incohérence
   arithmétique qui peut venir de l'OCR autant que de la facture).
 """
 
@@ -19,6 +19,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from .extract import CORE_FIELDS, Extractor, get_extractor
+from .extract.base import label
 from .models import FieldConfidence, Invoice
 from .reader import read_pdf
 from .validate import Issue, Severity, fine_exposure, validate
@@ -53,6 +54,7 @@ class Report(BaseModel):
     decision_reasons: list[str] = Field(default_factory=list)
     xml_valid: bool | None = None
     xml_failures: list[dict] = Field(default_factory=list)
+    schematrons_run: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
     timings_ms: dict[str, float] = Field(default_factory=dict)
 
@@ -68,30 +70,47 @@ class Result:
     facturx_pdf: bytes | None = None
 
 
+ARITHMETIC_LABELS = {
+    "TOTALS-UNBALANCED": "HT plus TVA différent du TTC",
+    "LINES-SUM-MISMATCH": "somme des lignes différente du total HT",
+    "VAT-BREAKDOWN-MISMATCH": "TVA par taux différente du total de TVA",
+    "LINE-ARITHMETIC": "quantité fois prix unitaire différent du montant d'une ligne",
+    "VAT-CALCULATION": "montant de TVA incohérent avec le taux",
+}
+
+
 def decide(
     mean_conf: float, confidence: dict[str, FieldConfidence], issues: list[Issue]
 ) -> tuple[Decision, list[str]]:
+    """Choisit la suite à donner et l'explique en phrases lisibles."""
     reasons = []
     if mean_conf < REVIEW_THRESHOLD:
-        reasons.append(f"confiance moyenne {mean_conf:.2f} < {REVIEW_THRESHOLD}")
+        reasons.append(
+            f"Confiance moyenne de {mean_conf * 100:.0f} %, sous le seuil de {REVIEW_THRESHOLD * 100:.0f} %."
+        )
     weak = [
         f
         for f in CORE_FIELDS
         if (confidence.get(f).value if f in confidence else 0.0) < FIELD_FLOOR
     ]
     if weak:
-        reasons.append("champs incertains ou absents : " + ", ".join(weak))
+        reasons.append("Lecture incertaine ou absente : " + ", ".join(label(f) for f in weak) + ".")
     arith = sorted({i.code for i in issues} & ARITHMETIC)
     if arith:
-        reasons.append("incohérence arithmétique (lecture ou facture ?) : " + ", ".join(arith))
+        reasons.append(
+            "Montants incohérents, erreur de lecture ou de facture : "
+            + ", ".join(ARITHMETIC_LABELS[c] for c in arith)
+            + "."
+        )
     if reasons:
         return Decision.HUMAN_REVIEW, reasons
     errors = [i for i in issues if i.severity == Severity.ERROR]
     if errors:
+        plural = "s" if len(errors) > 1 else ""
         return Decision.FIX_REQUIRED, [
-            f"{len(errors)} anomalie(s) bloquante(s) : " + ", ".join(i.code for i in errors)
+            f"{len(errors)} anomalie{plural} bloquante{plural} à corriger chez l'émetteur."
         ]
-    return Decision.READY, ["extraction sûre, aucune anomalie bloquante"]
+    return Decision.READY, ["Lecture sûre et aucune anomalie bloquante."]
 
 
 def process(
@@ -100,6 +119,7 @@ def process(
     facturx: bool = False,
     schematron: bool = False,
     force_ocr: bool = False,
+    build_xml: bool = False,
 ) -> Result:
     """Traite une facture PDF et renvoie le rapport (et, sur demande, le XML et le PDF Factur-X)."""
     timings: dict[str, float] = {}
@@ -133,7 +153,7 @@ def process(
     )
     result = Result(report=report)
 
-    if facturx or schematron:
+    if facturx or schematron or build_xml:
         from .export.cii import ExportError, build_cii
 
         t3 = time.perf_counter()
@@ -147,10 +167,11 @@ def process(
             xml_report = check_xml(result.xml, schematron=schematron)
             report.xml_valid = xml_report.valid if schematron else xml_report.xsd_valid
             report.xml_failures = xml_report.failures
+            report.schematrons_run = xml_report.schematron_run
             if xml_report.xsd_error:
                 report.notes.append("XSD : " + xml_report.xsd_error)
             if facturx and xml_report.xsd_valid:
-                from .export.facturx_pdf import embed_facturx
+                from .export.pdf import embed_facturx
 
                 result.facturx_pdf = embed_facturx(pdf_bytes, result.xml, ex.invoice)
         timings["export"] = (time.perf_counter() - t3) * 1000

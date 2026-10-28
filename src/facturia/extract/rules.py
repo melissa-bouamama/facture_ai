@@ -105,7 +105,7 @@ def repair_ocr_ids(text: str) -> str:
     """Corrige les confusions lettre/chiffre dans les identifiants, si la clé de contrôle le confirme.
 
     « FRO7552813248 » (O lu à la place de 0) devient « FR07552813248 » parce que la clé
-    corrigée est valide ; une chaîne qui ne passe pas la clé est laissée telle quelle.
+    corrigée est valide. Une chaîne qui ne passe pas la clé est laissée telle quelle.
     """
 
     def fix(m: re.Match) -> str:

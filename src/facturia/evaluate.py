@@ -1,6 +1,6 @@
 """Évaluation sur un dossier de factures annotées (`facture.pdf` + `facture.json`).
 
-Le JSON suit le modèle `Invoice` ; une clé optionnelle `_spec.expected_issues` liste les
+Le JSON suit le modèle `Invoice`. Une clé optionnelle `_spec.expected_issues` liste les
 anomalies de conformité attendues, ce qui permet de mesurer aussi la détection.
 Le format est volontairement simple pour pouvoir évaluer sur un jeu réel annoté à la main.
 """
@@ -24,6 +24,39 @@ COMPLIANCE_CODES = [
     "FR-BUYER-SIREN-MISSING", "FR-OPERATION-CATEGORY-MISSING", "FR-NOTE-PENALTIES-MISSING",
     "FR-NOTE-RECOVERY-FEE-MISSING", "FR-NOTE-DISCOUNT-MISSING", "FR-INVOICE-NUMBER-FORMAT",
 ]  # fmt: skip
+
+
+FIELD_NAMES = {
+    "number": "Numéro de facture",
+    "issue_date": "Date d'émission",
+    "due_date": "Échéance",
+    "seller.name": "Nom du vendeur",
+    "seller.siren": "SIREN du vendeur",
+    "seller.vat_id": "TVA du vendeur",
+    "buyer.name": "Nom du client",
+    "buyer.siren": "SIREN du client",
+    "buyer.vat_id": "TVA du client",
+    "total_without_vat": "Total HT",
+    "total_vat": "Total TVA",
+    "total_with_vat": "Total TTC",
+    "iban": "IBAN",
+    "operation_category": "Catégorie d'opération",
+    "lines": "Lignes",
+}
+ISSUE_NAMES = {
+    "FR-BUYER-SIREN-MISSING": "SIREN du client absent",
+    "FR-OPERATION-CATEGORY-MISSING": "Catégorie d'opération absente",
+    "FR-NOTE-PENALTIES-MISSING": "Pénalités de retard absentes",
+    "FR-NOTE-RECOVERY-FEE-MISSING": "Indemnité de 40 € absente",
+    "FR-NOTE-DISCOUNT-MISSING": "Conditions d'escompte absentes",
+    "FR-INVOICE-NUMBER-FORMAT": "Numéro de facture mal formé",
+}
+DECISION_NAMES = {
+    "ready": "Prête à émettre",
+    "fix_required": "À corriger",
+    "human_review": "Revue humaine",
+}
+SOURCE_LABELS = {"native": "PDF natifs", "ocr": "Scans", "mixed": "PDF mixtes"}
 
 
 def _get(inv: Invoice, path: str):
@@ -65,40 +98,47 @@ class EvalResult:
     errors: list[dict] = field(default_factory=list)
 
     def to_markdown(self, title: str = "Résultats") -> str:
+        def pct(x: float) -> str:
+            return f"{x * 100:.1f} %".replace(".", ",")
+
         sources = sorted(self.field_accuracy_by_source)
         out = [
             f"## {title}",
             "",
-            f"{self.n_docs} factures — exactitude par champ (correspondance exacte après normalisation)",
+            f"{self.n_docs} factures. Exactitude par champ, en correspondance exacte après normalisation.",
             "",
         ]
         head = (
             "| Champ | Global | "
-            + " | ".join(f"{s} (n={int(self.field_accuracy_by_source[s]['_n'])})" for s in sources)
+            + " | ".join(
+                f"{SOURCE_LABELS.get(s, s)} ({int(self.field_accuracy_by_source[s]['_n'])})"
+                for s in sources
+            )
             + " |"
         )
         out += [head, "|" + "---|" * (2 + len(sources))]
         for f in TRACKED_FIELDS:
             row = (
-                f"| `{f}` | {self.field_accuracy[f]:.1%} | "
-                + " | ".join(f"{self.field_accuracy_by_source[s][f]:.1%}" for s in sources)
+                f"| {FIELD_NAMES[f]} | {pct(self.field_accuracy[f])} | "
+                + " | ".join(pct(self.field_accuracy_by_source[s][f]) for s in sources)
                 + " |"
             )
             out.append(row)
         out += [
             "",
-            f"**Factures extraites sans aucune erreur sur les {len(TRACKED_FIELDS)} champs : {self.doc_exact:.1%}**",
+            f"**Factures extraites sans aucune erreur sur les {len(TRACKED_FIELDS)} champs : "
+            f"{pct(self.doc_exact)}**",
             "",
         ]
         out += [
             "### Détection des mentions obligatoires manquantes",
             "",
-            "| Anomalie | Précision | Rappel | Support |",
+            "| Anomalie | Précision | Rappel | Cas |",
             "|---|---|---|---|",
         ]
         for code, m in self.compliance.items():
             out.append(
-                f"| `{code}` | {m['precision']:.1%} | {m['recall']:.1%} | {int(m['support'])} |"
+                f"| {ISSUE_NAMES[code]} | {pct(m['precision'])} | {pct(m['recall'])} | {int(m['support'])} |"
             )
         out += [
             "",
@@ -107,16 +147,19 @@ class EvalResult:
             "| Décision | Factures |",
             "|---|---|",
         ]
-        out += [f"| `{k}` | {v} |" for k, v in sorted(self.decisions.items())]
+        out += [f"| {DECISION_NAMES[k]} | {v} |" for k, v in sorted(self.decisions.items())]
         out += [
             "",
-            f"- Factures avec au moins un champ essentiel faux **non envoyées en revue** (erreurs silencieuses) : "
-            f"**{self.silent_errors}** / {self.n_docs}",
-            f"- Factures avec un champ essentiel faux correctement envoyées en revue : {self.reviewed_with_errors}",
+            "Factures avec au moins un champ essentiel faux **non envoyées en revue** "
+            f"(erreurs silencieuses) : **{self.silent_errors}** sur {self.n_docs}.",
+            "",
+            "Factures avec un champ essentiel faux correctement envoyées en revue : "
+            f"{self.reviewed_with_errors}.",
         ]
-        out += ["", "### Latence (ms, CPU)", "", "| Source | médiane | p95 |", "|---|---|---|"]
+        out += ["", "### Latence (ms, CPU)", "", "| Source | Médiane | p95 |", "|---|---|---|"]
         out += [
-            f"| {s} | {v['p50']:.0f} | {v['p95']:.0f} |" for s, v in sorted(self.latency_ms.items())
+            f"| {SOURCE_LABELS.get(s, s)} | {v['p50']:.0f} | {v['p95']:.0f} |"
+            for s, v in sorted(self.latency_ms.items())
         ]
         return "\n".join(out) + "\n"
 

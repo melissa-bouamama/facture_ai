@@ -1,5 +1,5 @@
 {
-  "file": "facture_conforme.pdf",
+  "file": "conforme.pdf",
   "source": "native",
   "backend": "rules",
   "invoice": {
@@ -168,7 +168,7 @@
   "fine_exposure_eur": "0.00",
   "decision": "ready",
   "decision_reasons": [
-    "extraction sûre, aucune anomalie bloquante"
+    "Lecture sûre et aucune anomalie bloquante."
   ],
   "xml_valid": true,
   "xml_failures": [
@@ -180,12 +180,16 @@
       "message": "[PEPPOL-EN16931-R008]-Document MUST not contain empty elements. (still status warning)"
     }
   ],
+  "schematrons_run": [
+    "en16931",
+    "br-fr"
+  ],
   "notes": [],
   "timings_ms": {
-    "read": 30.6,
-    "extract": 7.0,
+    "read": 29.2,
+    "extract": 5.6,
     "validate": 0.2,
-    "export": 715.4,
-    "total": 761.5
+    "export": 772.4,
+    "total": 814.0
   }
 }

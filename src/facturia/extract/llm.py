@@ -5,9 +5,9 @@ hébergée (Mistral, OpenAI…). Les factures contiennent des données commercia
 sensibles : l'inférence locale est le mode par défaut (`http://localhost:11434/v1`).
 
 Garde-fous contre les hallucinations :
-1. sortie JSON validée par un schéma (Pydantic) avec une tentative d'auto-réparation ;
+1. sortie JSON validée par un schéma (Pydantic), avec une tentative de réparation.
 2. *ancrage* : un identifiant, un IBAN ou un montant renvoyé par le modèle n'est
-   conservé que s'il apparaît réellement dans le texte du document ;
+   conservé que s'il apparaît réellement dans le texte du document.
 3. clés de contrôle (Luhn, mod 97) appliquées comme pour l'extracteur à règles.
 """
 
@@ -26,7 +26,7 @@ from .. import identifiers as ids
 from ..models import Address, Invoice, InvoiceLine, OperationCategory, Party, VatBreakdown
 from ..normalize import money, parse_amount, parse_date, parse_rate
 from ..reader import Document
-from .base import CORE_FIELDS, Extraction
+from .base import CORE_FIELDS, Extraction, label
 from .rules import fold
 
 
@@ -89,9 +89,9 @@ Règles :
 - Recopie les identifiants exactement (SIREN 9 chiffres, SIRET 14 chiffres, TVA « FR » + 11 caractères, IBAN).
 - Montants et taux : chaînes décimales avec un point (« 1234.56 », « 20 »), sans symbole €.
 - Dates au format AAAA-MM-JJ.
-- seller = l'émetteur de la facture ; buyer = le client facturé.
+- seller est l'émetteur de la facture, buyer est le client facturé.
 - operation_category : « LB » (livraison de biens), « PS » (prestation de services), « LBPS » (mixte),
-  uniquement si la catégorie est écrite sur la facture ; sinon null.
+  uniquement si la catégorie est écrite sur la facture, sinon null.
 - late_penalty_note, recovery_fee_note, discount_note : recopie la phrase correspondante si elle existe.
 Le texte est reconstruit depuis la mise en page : « | » sépare des cellules d'une même ligne."""
 
@@ -308,7 +308,9 @@ def to_extraction(raw: LLMInvoice, doc: Document, backend: str = "llm") -> Extra
     ex = Extraction(invoice=inv, backend=backend)
     if rejected:
         ex.notes.append(
-            "valeurs LLM rejetées (non ancrées ou clé invalide) : " + ", ".join(rejected)
+            "Valeurs du LLM rejetées car absentes du document ou clé invalide : "
+            + ", ".join(label(r) for r in rejected)
+            + "."
         )
     balanced = None not in (inv.total_without_vat, inv.total_vat, inv.total_with_vat) and (
         money(inv.total_without_vat + inv.total_vat) == money(inv.total_with_vat)

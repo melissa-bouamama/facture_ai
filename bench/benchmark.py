@@ -3,10 +3,10 @@
     python bench/run_benchmark.py                      # extracteur à règles
     python bench/run_benchmark.py --backend hybrid     # nécessite un LLM (FACTURIA_LLM_BASE_URL)
 
-Jeux générés (graines fixes) :
-- `in-distribution` : 200 factures, 4 gabarits, 30 % dégradées en scan ;
-- `hors-gabarit`    : 60 factures sur un gabarit dont le vocabulaire n'a pas servi à écrire
-                      les règles — mesure la généralisation et les erreurs silencieuses.
+Jeux générés, à graine fixe :
+    connus   200 factures sur les 4 gabarits ayant servi à écrire les règles, 30 % en scan.
+    inconnu  60 factures sur un gabarit dont le vocabulaire n'a pas servi à écrire les règles.
+             Il mesure la généralisation et les erreurs silencieuses.
 """
 
 from __future__ import annotations
@@ -22,8 +22,8 @@ from facturia.synth import HELDOUT_TEMPLATES, generate_dataset
 
 ROOT = Path(__file__).parent
 DATASETS = {
-    "in-distribution": {"n": 200, "seed": 2026, "templates": None},
-    "hors-gabarit": {"n": 60, "seed": 99, "templates": HELDOUT_TEMPLATES},
+    "connus": {"n": 200, "seed": 2026, "templates": None, "title": "Gabarits connus"},
+    "inconnu": {"n": 60, "seed": 99, "templates": HELDOUT_TEMPLATES, "title": "Gabarit inconnu"},
 }
 
 
@@ -33,7 +33,8 @@ def main() -> None:
     parser.add_argument("--data", type=Path, default=ROOT / "data")
     parser.add_argument("--out", type=Path, default=ROOT / "results")
     args = parser.parse_args()
-    args.out.mkdir(parents=True, exist_ok=True)
+    out_dir = args.out / args.backend
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     summary = {"backend": args.backend, "date": date.today().isoformat(), "python": platform.python_version(),
                "cpu": platform.processor() or platform.machine(), "datasets": {}}  # fmt: skip
@@ -44,8 +45,8 @@ def main() -> None:
                 folder, n=cfg["n"], seed=cfg["seed"], scanned_ratio=0.3, templates=cfg["templates"]
             )
         result = evaluate(folder, extractor=args.backend)
-        md = result.to_markdown(f"{name} — extracteur `{args.backend}`")
-        (args.out / f"{args.backend}_{name}.md").write_text(md, encoding="utf-8")
+        md = result.to_markdown(f"{cfg['title']}, extracteur {args.backend}")
+        (out_dir / f"{name}.md").write_text(md, encoding="utf-8")
         summary["datasets"][name] = {
             "n_docs": result.n_docs,
             "doc_exact": round(result.doc_exact, 4),
@@ -61,7 +62,7 @@ def main() -> None:
             },
         }
         print(md)
-    (args.out / f"{args.backend}_summary.json").write_text(
+    (out_dir / "resume.json").write_text(
         json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8"
     )
 

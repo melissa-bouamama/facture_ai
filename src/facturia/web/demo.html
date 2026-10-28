@@ -1,0 +1,651 @@
+<title>Démo factur-ia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@800&family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap">
+<style>
+/* Mise en page : un bandeau pour choisir la pièce, puis deux feuilles côte à côte,
+   la facture lue à gauche et la fiche de contrôle tamponnée à droite. */
+:root {
+  --paper: #edf1f6;
+  --sheet: #ffffff;
+  --ink: #172033;
+  --muted: #586579;
+  --rule: #c6d0dd;
+  --bic: #1f4fb8;
+  --bic-soft: #e2eafb;
+  --ok: #1b7a4a;
+  --fix: #bf4815;
+  --review: #6a3ea6;
+  --marker: #ffe27a;
+  --marker-ink: #172033;
+  --shadow: 0 1px 2px rgb(23 32 51 / 8%), 0 10px 28px rgb(23 32 51 / 7%);
+  --font-ui: "Public Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-stamp: "Big Shoulders Display", "Arial Narrow", "Roboto Condensed", Impact, sans-serif;
+  --step--1: 0.8125rem;
+  --step-0: 0.9375rem;
+  --step-1: 1.125rem;
+  --step-2: 1.5rem;
+  --radius: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e131c; --sheet: #161d2a; --ink: #e3e9f2; --muted: #97a3b6; --rule: #2b374c;
+    --bic: #8aabff; --bic-soft: #1b2944; --ok: #4fc68a; --fix: #ff8c58; --review: #b698f3;
+    --marker: #5b4b10; --marker-ink: #fff3c9; --shadow: 0 1px 2px rgb(0 0 0 / 40%);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e131c; --sheet: #161d2a; --ink: #e3e9f2; --muted: #97a3b6; --rule: #2b374c;
+  --bic: #8aabff; --bic-soft: #1b2944; --ok: #4fc68a; --fix: #ff8c58; --review: #b698f3;
+  --marker: #5b4b10; --marker-ink: #fff3c9; --shadow: 0 1px 2px rgb(0 0 0 / 40%);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 var(--step-0)/1.5 var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+a { color: var(--bic); }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--bic); outline-offset: 2px; }
+
+.wrap {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+/* En-tête */
+.masthead { padding-block: 22px 14px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; }
+.brand { margin: 0; font-size: var(--step-2); font-weight: 700; letter-spacing: -0.01em; }
+.tagline { margin: 0; color: var(--muted); max-width: 62ch; flex: 1 1 320px; }
+.mode { font-size: var(--step--1); border: 1px solid var(--rule); border-radius: 999px; padding: 2px 10px; color: var(--muted); white-space: nowrap; }
+.mode[data-live="true"] { color: var(--ok); border-color: currentColor; }
+
+/* Bandeau de choix */
+.controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px 24px;
+  align-items: end;
+  padding-block: 14px;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+.pick { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.pick-label, .opt-label { font-size: var(--step--1); color: var(--muted); }
+.samples { display: flex; flex-wrap: wrap; gap: 8px; }
+.sample, .upload, .btn {
+  border: 1px solid var(--rule);
+  background: var(--sheet);
+  border-radius: var(--radius);
+  padding: 7px 12px;
+  cursor: pointer;
+  line-height: 1.3;
+}
+.sample:hover, .upload:hover, .btn:hover { border-color: var(--bic); }
+.sample[aria-pressed="true"] { border-color: var(--bic); background: var(--bic-soft); color: var(--bic); font-weight: 600; }
+.upload { display: inline-flex; align-items: center; gap: 8px; border-style: dashed; }
+.upload input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.upload:focus-within { outline: 2px solid var(--bic); outline-offset: 2px; }
+.upload[aria-disabled="true"] { cursor: not-allowed; opacity: .6; }
+.options { display: flex; flex-wrap: wrap; gap: 14px 20px; align-items: center; }
+.engine { display: inline-flex; border: 1px solid var(--rule); border-radius: var(--radius); overflow: hidden; background: var(--sheet); }
+.engine label { position: relative; padding: 6px 12px; cursor: pointer; border-left: 1px solid var(--rule); }
+.engine label:first-child { border-left: 0; }
+.engine input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+.engine label:has(input:checked) { background: var(--bic); color: var(--sheet); font-weight: 600; }
+.engine label:has(input:focus-visible) { outline: 2px solid var(--bic); outline-offset: -3px; }
+.engine label:has(input:disabled) { cursor: not-allowed; opacity: .55; }
+.check { display: inline-flex; gap: 8px; align-items: center; cursor: pointer; }
+.static-note { grid-column: 1 / -1; margin: 0; font-size: var(--step--1); color: var(--muted); }
+.static-note code { background: var(--bic-soft); color: var(--ink); padding: 1px 6px; border-radius: 4px; }
+
+/* Deux feuilles */
+.desk {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 28px;
+  padding-block: 24px 40px;
+  align-items: start;
+}
+.piece { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.piece-frame {
+  background: var(--sheet);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  aspect-ratio: 210 / 297;
+  max-width: 100%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.piece-frame img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.piece-caption { font-size: var(--step--1); color: var(--muted); margin: 0; overflow-wrap: anywhere; }
+
+.sheet {
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 24px clamp(16px, 3vw, 32px) 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  min-width: 0;
+  position: relative;
+}
+.sheet h2 { margin: 0 0 10px; font-size: var(--step-1); font-weight: 700; text-wrap: balance; }
+.sheet h3 { margin: 0; font-size: var(--step--1); font-weight: 600; color: var(--muted); }
+
+/* Verdict et tampon */
+.verdict { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 18px 28px; align-items: center; }
+.stamp {
+  --c: var(--muted);
+  color: var(--c);
+  border: 3px solid currentColor;
+  border-radius: 10px;
+  padding: 8px 16px 6px;
+  transform: rotate(-4deg);
+  font-family: var(--font-stamp);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-align: center;
+  filter: url(#ink);
+  opacity: .92;
+  min-width: 13ch;
+}
+.stamp .big { display: block; font-size: 2rem; }
+.stamp .date { display: block; font-size: 0.85rem; letter-spacing: 0.12em; margin-top: 6px; border-top: 2px solid currentColor; padding-top: 5px; }
+.stamp[data-d="ready"] { --c: var(--ok); }
+.stamp[data-d="fix_required"] { --c: var(--fix); }
+.stamp[data-d="human_review"] { --c: var(--review); }
+.stamp.thump { animation: thump 320ms cubic-bezier(.2, .9, .3, 1.2); }
+@keyframes thump {
+  0% { transform: rotate(-9deg) scale(1.7); opacity: 0; }
+  70% { transform: rotate(-3deg) scale(.96); opacity: .95; }
+  100% { transform: rotate(-4deg) scale(1); opacity: .92; }
+}
+@media (prefers-reduced-motion: reduce) { .stamp.thump { animation: none; } }
+.verdict-text { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.verdict-text p { margin: 0; }
+.verdict-lead { font-size: var(--step-1); font-weight: 600; }
+.reasons { margin: 0; padding-left: 18px; color: var(--muted); }
+.facts { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: var(--step--1); color: var(--muted); }
+.facts strong { color: var(--ink); font-weight: 600; }
+
+/* Cases de formulaire */
+.groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 20px; }
+.group { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.group.wide { grid-column: 1 / -1; }
+.boxes { display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 4px; overflow: hidden; }
+.boxes.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.boxes.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.boxes.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.box { background: var(--sheet); padding: 7px 10px 8px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.box-head { font-size: 0.75rem; color: var(--muted); }
+.box-val { overflow-wrap: anywhere; font-weight: 500; }
+.box-val.empty { color: var(--muted); font-style: italic; font-weight: 400; }
+.box.flag { background: var(--marker); color: var(--marker-ink); }
+.box.flag .box-head, .box.flag .box-val.empty { color: var(--marker-ink); }
+.conf { font-size: 0.6875rem; color: var(--muted); }
+.conf.low { color: var(--fix); font-weight: 600; }
+
+/* Lignes */
+.table-scroll { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; }
+table { border-collapse: collapse; width: 100%; font-size: var(--step--1); }
+th, td { padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-weight: 600; color: var(--muted); background: var(--paper); white-space: nowrap; }
+td.num, th.num { text-align: right; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+
+/* Anomalies */
+.issues { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.issue { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: 4px 14px; }
+.sev { font-size: var(--step--1); font-weight: 600; padding-top: 1px; }
+.sev[data-s="error"] { color: var(--fix); }
+.sev[data-s="warning"] { color: var(--review); }
+.sev[data-s="info"] { color: var(--muted); font-weight: 500; }
+.issue-msg { margin: 0; }
+.issue[data-s="error"] .issue-msg mark { background: var(--marker); color: var(--marker-ink); padding: 0 2px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.issue-msg mark { background: none; color: inherit; }
+.issue-meta { grid-column: 2; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 0.75rem; color: var(--muted); }
+.issue-fix { grid-column: 2; font-size: var(--step--1); margin: 0; }
+.issue-fix b { font-weight: 600; }
+.empty-state { margin: 0; color: var(--muted); }
+.fine { margin: 0; font-size: var(--step--1); }
+
+/* Factur-X */
+.xml-checks { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 20px; }
+.xml-checks li::before { content: "✓ "; color: var(--ok); font-weight: 700; }
+.xml-checks li[data-ok="false"]::before { content: "✕ "; color: var(--fix); }
+.xml-checks li[data-ok="na"]::before { content: "○ "; color: var(--muted); }
+.xml-fails { margin: 0 0 12px; padding-left: 18px; font-size: var(--step--1); color: var(--muted); }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.btn.primary { background: var(--bic); border-color: var(--bic); color: var(--sheet); font-weight: 600; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.hint { font-size: var(--step--1); color: var(--muted); margin: 0; }
+details { margin-top: 12px; }
+summary { cursor: pointer; color: var(--bic); }
+pre.xml { max-height: 340px; overflow: auto; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 12px; font-size: 0.75rem; line-height: 1.45; white-space: pre; }
+.notes { margin: 0; padding-left: 18px; font-size: var(--step--1); color: var(--muted); }
+
+/* Chargement et erreurs */
+.busy { position: absolute; inset: 0; background: color-mix(in srgb, var(--sheet) 82%, transparent); display: grid; place-items: center; border-radius: var(--radius); font-weight: 600; z-index: 2; }
+.busy span { padding: 10px 16px; border: 1px solid var(--rule); background: var(--sheet); border-radius: var(--radius); }
+.alert { margin: 0; padding: 12px 14px; border: 1px solid var(--fix); color: var(--fix); border-radius: var(--radius); background: var(--sheet); }
+
+footer { padding-block: 0 32px; font-size: var(--step--1); color: var(--muted); }
+footer p { margin: 0; max-width: 72ch; }
+
+@media (max-width: 900px) {
+  .desk { grid-template-columns: minmax(0, 1fr); }
+  .piece { position: static; order: 2; }
+  .piece-frame { max-height: 70vh; }
+  .controls { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .groups { grid-template-columns: minmax(0, 1fr); }
+  .boxes.cols-3, .boxes.cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .verdict { grid-template-columns: minmax(0, 1fr); }
+  .stamp { justify-self: start; }
+  .issue { grid-template-columns: minmax(0, 1fr); }
+  .issue-meta, .issue-fix { grid-column: 1; }
+}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <filter id="ink">
+    <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7" result="noise"/>
+    <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.6"/>
+  </filter>
+</svg>
+
+<header class="wrap masthead">
+  <h1 class="brand">factur-ia</h1>
+  <p class="tagline">Lit une facture PDF, vérifie les mentions exigées par la réforme de 2026 et produit le Factur-X à transmettre à la plateforme agréée.</p>
+  <span class="mode" id="mode" data-live="false">Démo statique</span>
+</header>
+
+<section class="wrap controls" aria-label="Choix de la facture">
+  <div class="pick">
+    <span class="pick-label" id="pick-label">Factures d'exemple, toutes fictives</span>
+    <div class="samples" role="group" aria-labelledby="pick-label" id="samples">
+      <button type="button" class="sample" data-kind="corriger" id="s-corriger">Facture à corriger</button>
+      <button type="button" class="sample" data-kind="conforme" id="s-conforme">Facture conforme</button>
+      <button type="button" class="sample" data-kind="scan" id="s-scan">Facture scannée</button>
+      <button type="button" class="sample" data-kind="inconnue" id="s-inconnue">Mise en page inconnue</button>
+      <button type="button" class="sample" data-kind="hasard" id="s-hasard" hidden>Facture au hasard</button>
+      <label class="upload" id="upload" aria-disabled="true">
+        <input type="file" id="file" accept="application/pdf,.pdf" disabled>
+        <span id="upload-text">Analyser mon PDF</span>
+      </label>
+    </div>
+  </div>
+  <div class="options">
+    <div class="engine" role="radiogroup" aria-label="Moteur d'extraction">
+      <label title="Lecture par règles et mise en page, sans LLM"><input type="radio" name="engine" id="e-rules" value="rules" checked>Règles</label>
+      <label title="Règles, puis LLM local seulement en cas de doute"><input type="radio" name="engine" id="e-hybrid" value="hybrid" disabled>Hybride</label>
+      <label title="Lecture complète par le LLM"><input type="radio" name="engine" id="e-llm" value="llm" disabled>LLM</label>
+    </div>
+    <label class="check"><input type="checkbox" id="schematron" checked> Contrôler le XML avec les règles officielles</label>
+  </div>
+  <p class="static-note" id="static-note">Cette page montre des résultats déjà calculés. Pour analyser vos propres PDF et essayer le moteur hybride, lancez l'application avec <code>facturia serve</code> puis ouvrez localhost:8000.</p>
+</section>
+
+<main class="wrap desk">
+  <aside class="piece" aria-label="Facture analysée">
+    <div class="piece-frame"><img id="preview" alt="Aperçu de la première page de la facture"></div>
+    <p class="piece-caption" id="preview-caption"></p>
+  </aside>
+
+  <article class="sheet" id="sheet" aria-live="polite">
+    <div class="busy" id="busy" hidden><span id="busy-text">Lecture de la facture en cours</span></div>
+    <p class="alert" id="error" hidden></p>
+
+    <section class="verdict" aria-label="Décision">
+      <div class="stamp" id="stamp" data-d=""><span class="big" id="stamp-text">En attente</span><span class="date" id="stamp-date"></span></div>
+      <div class="verdict-text">
+        <p class="verdict-lead" id="verdict-lead">Choisissez une facture pour lancer le contrôle.</p>
+        <ul class="reasons" id="reasons"></ul>
+        <div class="facts" id="facts"></div>
+      </div>
+    </section>
+
+    <section aria-labelledby="h-read">
+      <h2 id="h-read">Ce que l'outil a lu</h2>
+      <div class="groups" id="groups"></div>
+    </section>
+
+    <section aria-labelledby="h-lines">
+      <h2 id="h-lines">Lignes de la facture</h2>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Désignation</th><th class="num">Qté</th><th class="num">Prix unitaire HT</th><th class="num">TVA</th><th class="num">Montant HT</th></tr></thead>
+          <tbody id="lines"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section aria-labelledby="h-issues">
+      <h2 id="h-issues">À corriger avant l'envoi</h2>
+      <ul class="issues" id="issues"></ul>
+    </section>
+
+    <section aria-labelledby="h-fx">
+      <h2 id="h-fx">Facture électronique Factur-X</h2>
+      <ul class="xml-checks" id="xml-checks"></ul>
+      <ul class="xml-fails" id="xml-fails"></ul>
+      <div class="actions">
+        <button type="button" class="btn primary" id="download" hidden>Télécharger le Factur-X</button>
+        <button type="button" class="btn" id="download-force" hidden>Générer quand même pour la démo</button>
+        <p class="hint" id="fx-hint"></p>
+      </div>
+      <details id="xml-details" hidden>
+        <summary>Voir le XML embarqué</summary>
+        <pre class="xml" id="xml"></pre>
+      </details>
+      <ul class="notes" id="notes"></ul>
+    </section>
+  </article>
+</main>
+
+<footer class="wrap">
+  <p>Toutes les entreprises, identifiants et montants de cette démo sont générés et fictifs. Code source et méthode d'évaluation sur <a href="https://github.com/melissa-bouamama/factur-ia" target="_blank" rel="noopener">GitHub</a>.</p>
+</footer>
+
+<script id="demo-data" type="application/json">null</script>
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  let DEMO = null;
+  try { DEMO = JSON.parse($("demo-data").textContent); } catch (e) { DEMO = null; }
+
+  const state = { live: false, kind: "corriger", blob: null, name: "", report: null, previewUrl: null };
+
+  const STAMP = { ready: "Prête à émettre", fix_required: "À corriger", human_review: "Revue humaine" };
+  const LEAD = {
+    ready: "La facture peut partir vers la plateforme agréée.",
+    fix_required: "L'émetteur doit corriger la facture avant l'envoi.",
+    human_review: "La lecture n'est pas assez sûre : une personne doit vérifier.",
+  };
+  const SEV = { error: "Bloquant", warning: "Alerte", info: "À vérifier" };
+  const CAT = { LB: "Livraison de biens", PS: "Prestation de services", LBPS: "Biens et services" };
+  const ENGINE = { rules: "règles", hybrid: "hybride", "hybrid:rules-only": "hybride, sans appel au LLM", "hybrid:rules-fallback": "hybride, LLM indisponible", llm: "LLM" };
+  const SOURCE = { native: "PDF natif", ocr: "scan lu par OCR", mixed: "PDF mixte" };
+
+  const eur = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" });
+  const num = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 3 });
+  const money = (v) => (v === null || v === undefined || v === "" ? null : eur.format(Number(v)));
+  const dateFr = (iso) => {
+    if (!iso) return null;
+    const [y, m, d] = iso.split("-").map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  };
+  const today = () => new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }).replace(".", "");
+  const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined && text !== null) n.textContent = text; return n; };
+  const spaced = (s, n) => (s ? s.replace(new RegExp(`(.{${n}})`, "g"), "$1 ").trim() : s);
+
+  /* ------------------------------------------------------------ rendu */
+  function confOf(r, key) { const c = r.confidence && r.confidence[key]; return c ? c.value : null; }
+  function flagged(r, keys) { return r.issues.some((i) => i.severity !== "info" && keys.includes(i.field)); }
+
+  function box(r, label, value, keys, opts = {}) {
+    const b = el("div", "box");
+    b.append(el("span", "box-head", label));
+    b.append(el("span", "box-val" + (value ? "" : " empty"), value || "absent"));
+    const c = keys.length && !opts.noConf ? confOf(r, keys[0]) : null;
+    if (c !== null && value) b.append(el("span", "conf" + (c < 0.6 ? " low" : ""), `confiance ${Math.round(c * 100)} %`));
+    if (flagged(r, keys)) b.classList.add("flag");
+    return b;
+  }
+
+  function group(title, cols, boxes, wide) {
+    const g = el("div", "group" + (wide ? " wide" : ""));
+    g.append(el("h3", "", title));
+    const wrap = el("div", `boxes cols-${cols}`);
+    boxes.forEach((b) => wrap.append(b));
+    g.append(wrap);
+    return g;
+  }
+
+  function render(r, xml) {
+    state.report = r;
+    const inv = r.invoice;
+    // tampon
+    const stamp = $("stamp");
+    stamp.dataset.d = r.decision;
+    $("stamp-text").textContent = STAMP[r.decision];
+    $("stamp-date").textContent = today();
+    stamp.classList.remove("thump"); void stamp.offsetWidth; stamp.classList.add("thump");
+    $("verdict-lead").textContent = LEAD[r.decision];
+    const reasons = $("reasons"); reasons.replaceChildren();
+    r.decision_reasons.forEach((t) => reasons.append(el("li", "", t)));
+    const facts = $("facts"); facts.replaceChildren();
+    const fact = (label, value) => { const s = el("span"); s.append(label + " "); s.append(el("strong", "", value)); facts.append(s); };
+    fact("Confiance moyenne", `${Math.round(r.mean_confidence * 100)} %`);
+    fact("Amende encourue", eur.format(Number(r.fine_exposure_eur || 0)));
+    fact("Source", SOURCE[r.source] || r.source);
+    fact("Moteur", ENGINE[r.backend] || r.backend);
+    if (r.timings_ms && r.timings_ms.total) fact("Durée", `${num.format(r.timings_ms.total / 1000)} s`);
+
+    // champs
+    const groups = $("groups"); groups.replaceChildren();
+    groups.append(group("Facture", 4, [
+      box(r, "Numéro", inv.number, ["number"]),
+      box(r, "Émise le", dateFr(inv.issue_date), ["issue_date"]),
+      box(r, "Échéance", dateFr(inv.due_date), ["due_date"]),
+      box(r, "Catégorie d'opération", inv.operation_category ? CAT[inv.operation_category] : null, ["operation_category"]),
+    ], true));
+    const party = (p, role) => [
+      box(r, "Raison sociale", p.name, [`${role}.name`]),
+      box(r, "SIREN", spaced(p.siren, 3), [`${role}.siren`]),
+      box(r, "TVA intracommunautaire", p.vat_id, [`${role}.vat_id`]),
+      box(r, "Adresse", [p.address.line1, [p.address.postcode, p.address.city].filter(Boolean).join(" ")].filter(Boolean).join(", "), [], { noConf: true }),
+    ];
+    groups.append(group("Vendeur", 2, party(inv.seller, "seller")));
+    groups.append(group("Client", 2, party(inv.buyer, "buyer")));
+    groups.append(group("Montants", 4, [
+      box(r, "Total HT", money(inv.total_without_vat), ["total_without_vat", "totals"]),
+      box(r, "TVA", money(inv.total_vat), ["total_vat", "totals"]),
+      box(r, "Total TTC", money(inv.total_with_vat), ["total_with_vat", "totals"]),
+      box(r, "IBAN", spaced(inv.iban, 4), ["iban"]),
+    ], true));
+
+    // lignes
+    const tbody = $("lines"); tbody.replaceChildren();
+    if (!inv.lines.length) {
+      const tr = el("tr"); const td = el("td", "", "Aucune ligne lue."); td.colSpan = 5; tr.append(td); tbody.append(tr);
+    }
+    inv.lines.forEach((ln) => {
+      const tr = el("tr");
+      tr.append(el("td", "", ln.description));
+      tr.append(el("td", "num", num.format(Number(ln.quantity))));
+      tr.append(el("td", "num", money(ln.unit_price) || ""));
+      tr.append(el("td", "num", ln.vat_rate !== null && ln.vat_rate !== undefined ? `${num.format(Number(ln.vat_rate))} %` : ""));
+      tr.append(el("td", "num", money(ln.net_amount) || ""));
+      tbody.append(tr);
+    });
+
+    // anomalies
+    const list = $("issues"); list.replaceChildren();
+    const order = { error: 0, warning: 1, info: 2 };
+    const issues = [...r.issues].sort((a, b) => order[a.severity] - order[b.severity]);
+    if (!issues.length) list.append(el("p", "empty-state", "Aucune anomalie. Toutes les mentions contrôlées sont présentes."));
+    issues.forEach((i) => {
+      const li = el("li", "issue"); li.dataset.s = i.severity;
+      const sev = el("span", "sev", SEV[i.severity]); sev.dataset.s = i.severity;
+      const msg = el("p", "issue-msg"); msg.append(el("mark", "", i.message));
+      li.append(sev, msg);
+      const meta = el("div", "issue-meta");
+      if (i.bt) meta.append(el("span", "", `Champ ${i.bt}`));
+      if (i.rule) meta.append(el("span", "", `Règle ${i.rule}`));
+      if (i.fine_eur) meta.append(el("span", "", `Amende ${eur.format(Number(i.fine_eur))}`));
+      if (meta.childElementCount) li.append(meta);
+      if (i.suggestion) { const f = el("p", "issue-fix"); f.append(el("b", "", "Suggestion : ")); f.append(i.suggestion); li.append(f); }
+      list.append(li);
+    });
+
+    // Factur-X
+    const checks = $("xml-checks"); checks.replaceChildren();
+    const fails = $("xml-fails"); fails.replaceChildren();
+    const blocking = (r.xml_failures || []).filter((f) => f.flag === "fatal" || f.flag === "error");
+    const add = (label, ok) => { const li = el("li", "", label); li.dataset.ok = ok; checks.append(li); };
+    const ran = r.schematrons_run || [];
+    if (r.xml_valid === null || r.xml_valid === undefined) {
+      add("XML non généré : données insuffisantes", "na");
+    } else {
+      add("Schéma XSD Factur-X EN 16931", String(!(r.notes || []).some((n) => n.startsWith("XSD"))));
+      const pass = (name) => (ran.includes(name) ? String(!blocking.some((f) => f.schematron === name)) : "na");
+      add(ran.includes("en16931") ? "Règles européennes EN 16931" : "Règles européennes EN 16931 non contrôlées", pass("en16931"));
+      add(ran.includes("br-fr") ? "Règles françaises BR-FR" : "Règles françaises BR-FR non contrôlées", pass("br-fr"));
+    }
+    blocking.slice(0, 6).forEach((f) => {
+      const text = f.message.replace(/^\S+\s*:\s*/, "");
+      fails.append(el("li", "", text));
+    });
+    const ready = r.decision === "ready";
+    $("download").hidden = !state.live || !ready;
+    $("download-force").hidden = !state.live || ready || r.xml_valid === null || r.xml_valid === undefined;
+    $("fx-hint").textContent = !state.live
+      ? "Le téléchargement est disponible quand l'application tourne en local."
+      : ready ? "Le PDF reste lisible par un humain et embarque le XML pour la machine."
+      : "La facture n'est pas conforme. Le fichier généré ne sert qu'à illustrer le format.";
+    $("xml-details").hidden = !xml;
+    $("xml").textContent = xml || "";
+    const notes = $("notes"); notes.replaceChildren();
+    (r.notes || []).filter((n) => !n.startsWith("XSD")).forEach((n) => notes.append(el("li", "", n)));
+  }
+
+  function setPreview(src, caption) {
+    if (state.previewUrl && state.previewUrl.startsWith("blob:")) URL.revokeObjectURL(state.previewUrl);
+    state.previewUrl = src;
+    $("preview").src = src;
+    $("preview-caption").textContent = caption;
+  }
+
+  function busy(on, text) {
+    $("busy").hidden = !on;
+    if (text) $("busy-text").textContent = text;
+    $("sheet").setAttribute("aria-busy", on ? "true" : "false");
+  }
+  function showError(msg) { $("error").hidden = !msg; $("error").textContent = msg || ""; }
+
+  function press(kind) {
+    document.querySelectorAll(".sample").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.kind === kind)));
+  }
+  const engine = () => document.querySelector('input[name="engine"]:checked').value;
+
+  /* ------------------------------------------------------------ mode statique */
+  function showStatic(kind) {
+    const s = DEMO && DEMO.samples[kind];
+    if (!s) return;
+    state.kind = kind; press(kind); showError("");
+    setPreview(s.preview, `${s.label}, première page`);
+    render(s.report, s.xml);
+  }
+
+  /* ------------------------------------------------------------ mode API */
+  async function api(path, opts) {
+    const res = await fetch(path, opts);
+    if (!res.ok) {
+      let detail = "";
+      try { const j = await res.json(); detail = typeof j.detail === "string" ? j.detail : ""; } catch (e) { /* corps non JSON */ }
+      throw new Error(detail || `Le serveur a répondu ${res.status}.`);
+    }
+    return res;
+  }
+
+  async function analyze(blob, name) {
+    state.blob = blob; state.name = name; showError("");
+    busy(true, blob.size > 150000 ? "Lecture du scan par OCR en cours" : "Lecture de la facture en cours");
+    try {
+      const fd = () => { const f = new FormData(); f.append("file", blob, name); return f; };
+      const q = new URLSearchParams({ backend: engine(), schematron: String($("schematron").checked), with_xml: "true" });
+      const [prev, rep] = await Promise.all([
+        api("v1/preview", { method: "POST", body: fd() }),
+        api(`v1/analyze?${q}`, { method: "POST", body: fd() }),
+      ]);
+      setPreview(URL.createObjectURL(await prev.blob()), name);
+      const report = await rep.json();
+      render(report, report.xml);
+    } catch (e) {
+      showError(`Analyse impossible. ${e.message}`);
+    } finally { busy(false); }
+  }
+
+  async function loadSample(kind) {
+    state.kind = kind; press(kind);
+    if (!state.live) { showStatic(kind); return; }
+    busy(true, "Préparation de la facture d'exemple");
+    try {
+      const seed = kind === "hasard" ? Math.floor(Math.random() * 100000) : 0;
+      const res = await api(`v1/demo/sample/${kind}?seed=${seed}`);
+      const label = document.querySelector(`.sample[data-kind="${kind}"]`).textContent;
+      await analyze(await res.blob(), `${label}.pdf`);
+    } catch (e) { busy(false); showError(`Exemple indisponible. ${e.message}`); }
+  }
+
+  async function download(force) {
+    if (!state.blob) return;
+    busy(true, "Génération du Factur-X");
+    try {
+      const f = new FormData(); f.append("file", state.blob, state.name);
+      const q = new URLSearchParams({ backend: engine(), force: String(force) });
+      const res = await api(`v1/convert?${q}`, { method: "POST", body: f });
+      const url = URL.createObjectURL(await res.blob());
+      const a = el("a"); a.href = url; a.download = state.name.replace(/\.pdf$/i, "") + " Factur-X.pdf";
+      document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    } catch (e) { showError(`Génération impossible. ${e.message}`); } finally { busy(false); }
+  }
+
+  function goLive() {
+    state.live = true;
+    $("mode").textContent = "Application locale";
+    $("mode").dataset.live = "true";
+    $("static-note").hidden = true;
+    $("s-hasard").hidden = false;
+    $("upload").setAttribute("aria-disabled", "false");
+    $("file").disabled = false;
+    $("e-hybrid").disabled = false; $("e-llm").disabled = false;
+  }
+
+  /* ------------------------------------------------------------ événements */
+  document.querySelectorAll(".sample").forEach((b) => b.addEventListener("click", () => loadSample(b.dataset.kind)));
+  $("file").addEventListener("change", (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    press(""); analyze(f, f.name); e.target.value = "";
+  });
+  ["dragover", "drop"].forEach((t) => document.addEventListener(t, (e) => {
+    if (!state.live) return;
+    e.preventDefault();
+    if (t === "drop") { const f = e.dataTransfer.files[0]; if (f) { press(""); analyze(f, f.name); } }
+  }));
+  $("download").addEventListener("click", () => download(false));
+  $("download-force").addEventListener("click", () => download(true));
+  document.querySelectorAll('input[name="engine"], #schematron').forEach((i) => i.addEventListener("change", () => {
+    if (state.live && state.blob) analyze(state.blob, state.name);
+  }));
+
+  /* ------------------------------------------------------------ démarrage */
+  if (DEMO) showStatic("corriger");
+  fetch("health", { cache: "no-store" })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((j) => { if (j && j.status === "ok") { goLive(); if (!DEMO) loadSample("corriger"); } else if (!DEMO) showError("Aucune donnée de démonstration et aucune API joignable."); })
+    .catch(() => { if (!DEMO) showError("Aucune donnée de démonstration et aucune API joignable."); });
+})();
+</script>

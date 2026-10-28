@@ -26,6 +26,31 @@ CORE_FIELDS = [
 ]  # fmt: skip
 
 
+# Noms lisibles des champs, pour les messages montrés à l'utilisateur.
+FIELD_LABELS = {
+    "number": "numéro de facture",
+    "issue_date": "date d'émission",
+    "due_date": "échéance",
+    "seller.name": "vendeur",
+    "seller.siren": "SIREN du vendeur",
+    "seller.vat_id": "TVA du vendeur",
+    "buyer.name": "client",
+    "buyer.siren": "SIREN du client",
+    "buyer.vat_id": "TVA du client",
+    "total_without_vat": "total HT",
+    "total_vat": "total TVA",
+    "total_with_vat": "total TTC",
+    "amount_due": "net à payer",
+    "iban": "IBAN",
+    "operation_category": "catégorie d'opération",
+    "lines": "lignes de la facture",
+}
+
+
+def label(field: str) -> str:
+    return FIELD_LABELS.get(field, field.replace("_", " ").replace(".", " "))
+
+
 @dataclass
 class Extraction:
     invoice: Invoice

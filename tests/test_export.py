@@ -1,7 +1,7 @@
 import pytest
 
 from facturia.export.cii import ExportError, build_cii
-from facturia.export.facturx_pdf import embed_facturx, read_facturx_xml
+from facturia.export.pdf import embed_facturx, read_facturx_xml
 from facturia.export.schematron import check_xml, check_xsd, saxon_available
 from facturia.models import Invoice
 

@@ -112,7 +112,7 @@ def parse_rate(text: str | None) -> Decimal | None:
 def fmt_amount(value: Decimal | None) -> str:
     """Format français lisible : 1 234,56."""
     if value is None:
-        return "—"
+        return "absent"
     q = money(value)
     sign = "-" if q < 0 else ""
     integer, _, frac = f"{abs(q):.2f}".partition(".")

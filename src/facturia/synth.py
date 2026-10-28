@@ -6,7 +6,7 @@ générateur produit des PDF réalistes et variés (4 gabarits, libellés synony
 de dates et de montants différents, mentions obligatoires volontairement omises) ainsi
 que le JSON attendu, ce qui permet de mesurer l'extraction et la détection d'anomalies.
 
-Toutes les entreprises sont fictives ; les identifiants (SIREN, SIRET, TVA, IBAN) sont
+Toutes les entreprises sont fictives. Les identifiants (SIREN, SIRET, TVA, IBAN) sont
 générés avec des clés de contrôle valides mais ne correspondent à aucune entité réelle
 connue.
 """
@@ -542,7 +542,7 @@ def generate_dataset(
     scanned_ratio: float = 0.3,
     templates: list[str] | None = None,
 ) -> list[Path]:
-    """Écrit `n` factures (PDF + JSON) dans `out_dir` ; une partie est dégradée en « scan »."""
+    """Écrit `n` factures (PDF + JSON) dans `out_dir`, dont une partie dégradée en scan."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     rng = random.Random(seed)
@@ -562,3 +562,44 @@ def generate_dataset(
         )
         paths.append(out / f"{stem}.pdf")
     return paths
+
+
+# --------------------------------------------------------------------------- démo
+
+DEMO_SAMPLES = {
+    "corriger": "Facture à corriger",
+    "conforme": "Facture conforme",
+    "scan": "Facture scannée",
+    "inconnue": "Mise en page inconnue",
+}
+_NEW_MENTIONS = {"FR-BUYER-SIREN-MISSING", "FR-OPERATION-CATEGORY-MISSING"}
+
+
+def sample_pdf(kind: str, seed: int = 0) -> bytes:
+    """Facture d'exemple pour la démo.
+
+    `corriger` : les nouvelles mentions 2026 manquent. `conforme` : aucune anomalie.
+    `scan` : facture conforme dégradée en scan. `inconnue` : gabarit hors distribution.
+    `hasard` : tirage libre (30 % de scans).
+    """
+    if kind not in {*DEMO_SAMPLES, "hasard"}:
+        raise ValueError(f"exemple inconnu : {kind}")
+    templates = HELDOUT_TEMPLATES if kind == "inconnue" else TEMPLATES
+    while True:
+        rng = random.Random(seed)
+        inv, spec = random_invoice(rng, templates)
+        issues = set(spec.expected_issues)
+        wanted = {
+            "corriger": issues >= _NEW_MENTIONS,
+            "conforme": not issues,
+            "scan": not issues,
+            "inconnue": True,
+            "hasard": True,
+        }[kind]
+        if wanted and len(inv.lines) >= 2:
+            break
+        seed += 1
+    pdf = render_pdf(inv, spec, rng)
+    if kind == "scan" or (kind == "hasard" and rng.random() < 0.3):
+        pdf = simulate_scan(pdf, rng)
+    return pdf

@@ -1,7 +1,7 @@
 """Lecture d'un PDF en mots positionnés, puis reconstruction de la mise en page.
 
 Deux chemins d'entrée :
-- PDF natif : les mots et leurs coordonnées sont lus directement (pdfplumber) ;
+- PDF natif : les mots et leurs coordonnées sont lus directement (pdfplumber).
 - PDF scanné : la page est rastérisée puis passée à Tesseract (fra+eng), qui renvoie
   aussi des boîtes englobantes et une confiance par mot.
 
@@ -111,7 +111,7 @@ class Document:
 
     @property
     def text(self) -> str:
-        """Texte ligne à ligne ; les cellules d'une même ligne sont séparées par « | »."""
+        """Texte ligne à ligne. Les cellules d'une même ligne sont séparées par « | »."""
         return "\n".join(ln.text for ln in self.lines)
 
     @property

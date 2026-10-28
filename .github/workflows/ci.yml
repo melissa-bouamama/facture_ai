@@ -37,3 +37,6 @@ jobs:
           docker run -d -p 8000:8000 --name api factur-ia
           for i in $(seq 1 30); do curl -sf http://localhost:8000/health && break; sleep 1; done
           curl -sf http://localhost:8000/health
+          curl -sf http://localhost:8000/ | grep -q "factur-ia"
+          curl -sf http://localhost:8000/v1/demo/sample/corriger -o sample.pdf
+          curl -sf -F file=@sample.pdf "http://localhost:8000/v1/analyze?schematron=true" | grep -q fix_required

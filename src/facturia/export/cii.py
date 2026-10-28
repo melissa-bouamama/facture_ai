@@ -91,7 +91,7 @@ def _party(parent, tag: str, p: Party, with_vat: bool = True) -> None:
 
 
 def _vat_groups(inv: Invoice) -> list[tuple[Decimal, Decimal, Decimal]]:
-    """(taux, base, montant) par taux ; recalculés depuis les lignes si besoin."""
+    """(taux, base, montant) par taux, recalculés depuis les lignes si besoin."""
     if inv.vat_breakdown:
         return [(vb.rate, vb.taxable_amount, vb.tax_amount) for vb in inv.vat_breakdown]
     bases: dict[Decimal, Decimal] = defaultdict(Decimal)

@@ -1,5 +1,5 @@
 {
-  "file": "facture_a_corriger.pdf",
+  "file": "corriger.pdf",
   "source": "native",
   "backend": "rules",
   "invoice": {
@@ -162,13 +162,13 @@
       "bt": "BT-23",
       "rule": "BR-FR-08",
       "fine_eur": "15",
-      "suggestion": "PS — Prestation de services"
+      "suggestion": "Prestation de services, code PS"
     }
   ],
   "fine_exposure_eur": "30.00",
   "decision": "fix_required",
   "decision_reasons": [
-    "2 anomalie(s) bloquante(s) : FR-BUYER-SIREN-MISSING, FR-OPERATION-CATEGORY-MISSING"
+    "2 anomalies bloquantes à corriger chez l'émetteur."
   ],
   "xml_valid": false,
   "xml_failures": [
@@ -194,12 +194,16 @@
       "message": "BR-FR-12/BT-49 : Le BT-49 est obligatoire. Valeur actuelle : BT-49=\"\"."
     }
   ],
+  "schematrons_run": [
+    "en16931",
+    "br-fr"
+  ],
   "notes": [],
   "timings_ms": {
-    "read": 35.1,
-    "extract": 2.7,
-    "validate": 0.1,
-    "export": 561.0,
-    "total": 599.0
+    "read": 44.7,
+    "extract": 4.5,
+    "validate": 0.2,
+    "export": 541.2,
+    "total": 590.6
   }
 }

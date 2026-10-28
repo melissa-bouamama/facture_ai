@@ -36,7 +36,7 @@ def as_llm_json(inv: Invoice, **overrides) -> str:
 
 
 class FakeLLM:
-    """Simule /chat/completions ; enregistre les requêtes reçues."""
+    """Simule /chat/completions et enregistre les requêtes reçues."""
 
     def __init__(self, *contents: str, status: int = 200, reject_schema: bool = False):
         self.contents = list(contents)
@@ -87,7 +87,7 @@ def test_llm_output_is_grounded_in_the_document(heldout_invoice):
     assert ex.invoice.seller.siren == inv.seller.siren
     assert ex.invoice.buyer.siren != fake_siren
     assert ex.invoice.total_with_vat is None
-    assert any("buyer.siren" in n and "total_with_vat" in n for n in ex.notes)
+    assert any("SIREN du client" in n and "total TTC" in n for n in ex.notes)
     assert fake.requests[0]["response_format"]["type"] == "json_schema"
     assert fake.requests[0]["temperature"] == 0
 

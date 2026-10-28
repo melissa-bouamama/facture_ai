@@ -29,47 +29,64 @@ DECISION_LABEL = {
 }
 
 
+SOURCE_LABEL = {"native": "PDF natif", "ocr": "scan lu par OCR", "mixed": "PDF mixte"}
+ENGINE_LABEL = {
+    "rules": "règles",
+    "llm": "LLM",
+    "hybrid": "hybride",
+    "hybrid:rules-only": "hybride, sans appel au LLM",
+    "hybrid:rules-fallback": "hybride, LLM indisponible",
+}
+SEVERITY_LABEL = {
+    "error": "[red]bloquant[/]",
+    "warning": "[yellow]alerte[/]",
+    "info": "[blue]à vérifier[/]",
+}
+
+
 def _print_report(report) -> None:
     inv = report.invoice
     style = DECISION_STYLE[report.decision.value]
+    absent = "[dim]absent[/]"
     console.print(
         Panel.fit(
-            f"[{style}]{DECISION_LABEL[report.decision.value]}[/]  ·  source : {report.source}  ·  "
-            f"extracteur : {report.backend}  ·  confiance : {report.mean_confidence:.2f}\n"
+            f"[{style}]{DECISION_LABEL[report.decision.value]}[/]\n"
+            f"Source : {SOURCE_LABEL.get(report.source, report.source)}. "
+            f"Moteur : {ENGINE_LABEL.get(report.backend, report.backend)}. "
+            f"Confiance moyenne : {report.mean_confidence * 100:.0f} %.\n"
             + "\n".join(f"• {r}" for r in report.decision_reasons),
-            title=f"Facture {inv.number or '?'}",
+            title=f"Facture {inv.number or 'sans numéro'}",
         )
     )
     t = Table(show_header=False, box=None)
     t.add_row(
         "Vendeur",
-        f"{inv.seller.name or '—'}  (SIREN {inv.seller.siren or '—'}, TVA {inv.seller.vat_id or '—'})",
+        f"{inv.seller.name or absent}, SIREN {inv.seller.siren or absent}, TVA {inv.seller.vat_id or absent}",
     )
-    t.add_row("Client", f"{inv.buyer.name or '—'}  (SIREN {inv.buyer.siren or '—'})")
-    t.add_row("Dates", f"émise le {inv.issue_date or '—'}, échéance {inv.due_date or '—'}")
+    t.add_row("Client", f"{inv.buyer.name or absent}, SIREN {inv.buyer.siren or absent}")
+    t.add_row("Dates", f"émise le {inv.issue_date or absent}, échéance le {inv.due_date or absent}")
     t.add_row(
         "Montants",
-        f"HT {fmt_amount(inv.total_without_vat)} · TVA {fmt_amount(inv.total_vat)} · TTC {fmt_amount(inv.total_with_vat)} {inv.currency}",
+        f"HT {fmt_amount(inv.total_without_vat)}, TVA {fmt_amount(inv.total_vat)}, "
+        f"TTC {fmt_amount(inv.total_with_vat)} {inv.currency}",
     )
     t.add_row("Lignes", str(len(inv.lines)))
-    t.add_row("Catégorie", inv.operation_category.label if inv.operation_category else "—")
+    t.add_row(
+        "Catégorie", inv.operation_category.label if inv.operation_category else "[dim]absente[/]"
+    )
     console.print(t)
     if report.issues:
         it = Table(title="Anomalies", show_lines=False)
-        for col in ("Gravité", "Code", "Champ", "Règle", "Message"):
+        for col in ("Gravité", "Champ", "Règle", "Message"):
             it.add_column(col)
         for i in report.issues:
-            sev = {
-                "error": "[red]erreur[/]",
-                "warning": "[yellow]alerte[/]",
-                "info": "[blue]info[/]",
-            }[i.severity.value]
-            msg = i.message + (f"\n[dim]→ suggestion : {i.suggestion}[/]" if i.suggestion else "")
-            it.add_row(sev, i.code, i.bt or "", i.rule or "", msg)
+            msg = i.message + (f"\n[dim]Suggestion : {i.suggestion}[/]" if i.suggestion else "")
+            it.add_row(SEVERITY_LABEL[i.severity.value], i.bt or "", i.rule or "", msg)
         console.print(it)
     if report.fine_exposure_eur:
         console.print(
-            f"Exposition estimée aux amendes (15 € par mention, plafond 25 %) : [bold]{fmt_amount(report.fine_exposure_eur)} €[/]"
+            "Amende encourue (15 € par mention, plafonnée à 25 % du TTC) : "
+            f"[bold]{fmt_amount(report.fine_exposure_eur)} €[/]"
         )
     if report.xml_valid is not None:
         console.print(
@@ -77,10 +94,13 @@ def _print_report(report) -> None:
         )
         for f in report.xml_failures:
             if f["flag"] in ("fatal", "error"):
-                console.print(f"  [red]✗[/] {f['schematron']} {f['id']} : {f['message'][:160]}")
+                message = f["message"].split(" : ", 1)[-1]
+                console.print(f"  [red]✗[/] {message[:160]}")
     for n in report.notes:
-        console.print(f"[dim]note : {n}[/]")
-    console.print(f"[dim]temps : {report.timings_ms}[/]")
+        console.print(f"[dim]Note : {n}[/]")
+    total = report.timings_ms.get("total")
+    if total:
+        console.print(f"[dim]Durée : {total / 1000:.2f} s[/]".replace(".", ","))
 
 
 @app.command()
@@ -130,7 +150,8 @@ def convert(
     _print_report(report)
     if report.decision != Decision.READY and not force:
         console.print(
-            "[yellow]Conversion non écrite : la facture n'est pas prête (utilisez --force pour l'écrire quand même).[/]"
+            "[yellow]Conversion non écrite : la facture n'est pas prête. "
+            "L'option force permet de l'écrire quand même.[/]"
         )
         raise typer.Exit(code=2)
     if result.facturx_pdf is None:
@@ -138,7 +159,7 @@ def convert(
             "[red]Impossible de produire le Factur-X (données insuffisantes ou XML invalide).[/]"
         )
         raise typer.Exit(code=1)
-    output = output or pdf.with_name(pdf.stem + "_facturx.pdf")
+    output = output or pdf.with_name(pdf.stem + ".facturx.pdf")
     output.write_bytes(result.facturx_pdf)
     output.with_suffix(".xml").write_bytes(result.xml)
     console.print(f"[green]✓[/] {output}  (+ {output.with_suffix('.xml').name})")

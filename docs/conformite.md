@@ -1,56 +1,62 @@
 # Contrôles de conformité
 
-Chaque anomalie produite par `facturia.validate` indique le champ EN 16931 concerné (BT/BG) et, quand elle existe, la règle officielle. Les codes `BR-FR-*` sont ceux du schematron français *Flux 2* distribué avec la bibliothèque `factur-x` ; les tests vérifient que notre validateur et ce schematron signalent les mêmes manques.
+Chaque anomalie produite par `facturia.validate` indique le champ EN 16931 concerné (BT ou BG) et, quand elle existe, la règle officielle. Les règles BR-FR sont celles du schematron français *Flux 2* distribué avec la bibliothèque `factur-x`. Les tests vérifient que le validateur de factur-ia et ce schematron signalent les mêmes manques. Le code technique de chaque anomalie, renvoyé par l'API, figure dans `validate.py`.
 
 ## Réforme 2026 et règles françaises
 
-| Code factur-ia | Gravité | Champ | Règle officielle | Amende 15 € |
+| Anomalie | Gravité | Champ | Règle officielle | Amende de 15 € |
 |---|---|---|---|---|
-| `FR-BUYER-SIREN-MISSING` / `-INVALID` | erreur | BT-47 | BR-FR-11 (et BR-FR-12 pour l'adresse électronique BT-49) | oui |
-| `FR-OPERATION-CATEGORY-MISSING` | erreur | BT-23 | BR-FR-08 (cadre de facturation B1 / S1 / M1) | oui |
-| `FR-DELIVERY-ADDRESS-CHECK` | info | BG-15 | mention obligatoire si l'adresse diffère | — |
-| `FR-VAT-DEBITS-CHECK` | info | BT-8 | mention obligatoire si option pour les débits | — |
-| `FR-SELLER-SIREN-MISSING` / `-INVALID` | erreur | BT-30 | BR-FR-10 | oui |
-| `FR-SELLER-SIRET-INCOHERENT` | erreur | BT-29 | BR-FR-09 | — |
-| `FR-INVOICE-NUMBER-FORMAT` | erreur | BT-1 | BR-FR-01/02 : `[A-Za-z0-9+-_/]`, 35 caractères max | — |
-| `FR-DATE-YEAR` | erreur | BT-2 | BR-FR-03 | — |
-| `FR-TYPE-CODE` | erreur | BT-3 | BR-FR-04 | — |
-| `FR-VAT-RATE-INVALID` | erreur | BT-119/152 | BR-FR-16 (taux autorisés en France) | — |
-| `FR-NOTE-PENALTIES-MISSING` | erreur | BT-22 | BR-FR-05 (note `PMD`), Code de commerce L441-9 | — |
-| `FR-NOTE-RECOVERY-FEE-MISSING` | erreur | BT-22 | BR-FR-05 (note `PMT`, indemnité de 40 €) | — |
-| `FR-NOTE-DISCOUNT-MISSING` | erreur | BT-22 | BR-FR-05 (note `AAB`) | — |
+| SIREN du client absent ou invalide | bloquante | BT-47 | BR-FR-11, et BR-FR-12 pour l'adresse électronique BT-49 | oui |
+| Catégorie d'opération absente | bloquante | BT-23 | BR-FR-08, cadre de facturation B1, S1 ou M1 | oui |
+| Adresse de livraison à vérifier | information | BG-15 | obligatoire si elle diffère de l'adresse de facturation | non |
+| Option TVA sur les débits à vérifier | information | BT-8 | obligatoire si le vendeur a opté pour les débits | non |
+| SIREN du vendeur absent ou invalide | bloquante | BT-30 | BR-FR-10 | oui |
+| SIRET incohérent avec le SIREN | bloquante | BT-29 | BR-FR-09 | non |
+| Numéro de facture mal formé | bloquante | BT-1 | BR-FR-01 et 02 : lettres, chiffres, plus, tiret, tiret bas et barre oblique, 35 caractères au plus | non |
+| Année hors de 2000 à 2099 | bloquante | BT-2 | BR-FR-03 | non |
+| Type de document non accepté | bloquante | BT-3 | BR-FR-04 | non |
+| Taux de TVA non autorisé en France | bloquante | BT-119, BT-152 | BR-FR-16 | non |
+| Pénalités de retard absentes | bloquante | BT-22 | BR-FR-05, note PMD, Code de commerce L441-9 | non |
+| Indemnité de 40 € absente | bloquante | BT-22 | BR-FR-05, note PMT | non |
+| Conditions d'escompte absentes | bloquante | BT-22 | BR-FR-05, note AAB | non |
 
 Les mentions du Code de commerce relèvent d'une amende administrative distincte, non chiffrée ici.
 
-## EN 16931 (socle européen)
+## EN 16931, le socle européen
 
-| Code factur-ia | Champ | Règle |
+| Anomalie | Champ | Règle |
 |---|---|---|
-| `CORE-NUMBER-MISSING` | BT-1 | BR-02 |
-| `CORE-ISSUE-DATE-MISSING` | BT-2 | BR-03 |
-| `CORE-SELLER-NAME-MISSING` | BT-27 | BR-06 |
-| `CORE-BUYER-NAME-MISSING` | BT-44 | BR-07 |
-| `CORE-TOTALS-MISSING` | BT-109/110/112 | BR-12/13/14 |
-| `CORE-NO-LINES` | BG-25 | BR-16 |
-| `SELLER-VAT-MISSING` | BT-31 | BR-S-02 |
-| `LINES-SUM-MISMATCH` | BT-106 | BR-CO-10 |
-| `VAT-BREAKDOWN-MISMATCH` | BT-110 | BR-CO-14 |
-| `TOTALS-UNBALANCED` | BT-112 | BR-CO-15 |
-| `VAT-CALCULATION` | BT-117 | BR-S-09 |
+| Numéro de facture absent | BT-1 | BR-02 |
+| Date d'émission absente | BT-2 | BR-03 |
+| Nom du vendeur absent | BT-27 | BR-06 |
+| Nom du client absent | BT-44 | BR-07 |
+| Totaux absents | BT-109, BT-110, BT-112 | BR-12, BR-13, BR-14 |
+| Aucune ligne de facture | BG-25 | BR-16 |
+| Numéro de TVA du vendeur absent | BT-31 | BR-S-02 |
+| Somme des lignes différente du total HT | BT-106 | BR-CO-10 |
+| TVA par taux différente du total de TVA | BT-110 | BR-CO-14 |
+| HT plus TVA différent du TTC | BT-112 | BR-CO-15 |
+| Montant de TVA incohérent avec le taux | BT-117 | BR-S-09 |
 
 ## Contrôles supplémentaires
 
-`SELLER-VAT-INVALID` (clé de TVA ≠ `(12 + 3 × (SIREN mod 97)) mod 97`), `SELLER-VAT-SIREN-MISMATCH`, `BUYER-VAT-INVALID`, `IBAN-INVALID` (mod 97), `LINE-ARITHMETIC` (qté × PU ≠ montant), `DUE-BEFORE-ISSUE`, `DATE-IN-FUTURE`, `AMOUNT-DUE-EXCEEDS-TOTAL`.
+* Clé du numéro de TVA incorrecte, calculée comme (12 + 3 × (SIREN mod 97)) mod 97.
+* Numéro de TVA qui ne correspond pas au SIREN du vendeur.
+* Clé du numéro de TVA du client incorrecte.
+* IBAN invalide selon la clé mod 97.
+* Quantité fois prix unitaire différent du montant d'une ligne.
+* Échéance antérieure à la date d'émission, ou date d'émission dans le futur.
+* Net à payer supérieur au total TTC.
 
 ## Choix de génération du XML
 
-| Donnée | Emplacement CII |
+| Donnée | Emplacement dans le XML CII |
 |---|---|
-| Catégorie d'opération | `ExchangedDocumentContext/BusinessProcessSpecifiedDocumentContextParameter/ID` = `B1`, `S1` ou `M1` |
-| Traitement B2B domestique | note `BAR` = `B2B` |
-| Pénalités / indemnité 40 € / escompte | notes `PMD` / `PMT` / `AAB` |
-| SIREN, SIRET | `SpecifiedLegalOrganization/ID@0002`, `GlobalID@0009` |
-| Adresse électronique de facturation | `URIUniversalCommunication/URIID@0225` = SIREN (adresse par défaut de l'annuaire) |
-| Option TVA sur les débits | `ApplicableTradeTax/DueDateTypeCode` = `5` |
+| Catégorie d'opération | `BusinessProcessSpecifiedDocumentContextParameter/ID`, valeur B1, S1 ou M1 |
+| Traitement B2B domestique | note BAR, valeur B2B |
+| Pénalités, indemnité de 40 €, escompte | notes PMD, PMT et AAB |
+| SIREN et SIRET | `SpecifiedLegalOrganization/ID` (schéma 0002) et `GlobalID` (schéma 0009) |
+| Adresse électronique de facturation | `URIUniversalCommunication/URIID` (schéma 0225), le SIREN par défaut comme dans l'annuaire |
+| Option TVA sur les débits | `ApplicableTradeTax/DueDateTypeCode`, valeur 5 |
 
-Ces correspondances suivent les spécifications externes françaises telles que reflétées par le schematron BR-FR ; elles sont à confirmer avec la plateforme agréée retenue (certaines exigent une adresse électronique BT-34/BT-49 différente du SIREN).
+Ces correspondances suivent les spécifications externes françaises telles que les reflète le schematron BR-FR. Elles sont à confirmer avec la plateforme agréée retenue, car certaines exigent une adresse électronique BT-34 ou BT-49 différente du SIREN.

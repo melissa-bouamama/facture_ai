@@ -276,7 +276,7 @@ def validate(inv: Invoice, today: date | None = None) -> list[Issue]:
             "BT-23",
             "BR-FR-08",
             fine=True,
-            suggestion=f"{guess.value} — {guess.label}" if guess else None,
+            suggestion=f"{guess.label}, code {guess.value}" if guess else None,
         )
     goods = inv.operation_category in (OperationCategory.GOODS, OperationCategory.MIXED) or (
         inv.operation_category is None

@@ -1,7 +1,7 @@
-# API + LLM local (Ollama) : les factures ne quittent pas la machine.
+# Interface, API et LLM local (Ollama) : les factures ne quittent pas la machine.
 #   docker compose up -d
 #   docker compose exec ollama ollama pull qwen2.5:7b-instruct
-#   curl -F file=@facture.pdf "http://localhost:8000/v1/analyze?backend=hybrid"
+#   puis ouvrir http://localhost:8000 (interface) ou http://localhost:8000/docs (API)
 services:
   api:
     build: .

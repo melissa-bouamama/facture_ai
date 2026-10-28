@@ -22,7 +22,7 @@ def test_new_2026_mentions_are_required(complete_invoice):
     found = codes(inv)
     assert {"FR-BUYER-SIREN-MISSING", "FR-OPERATION-CATEGORY-MISSING"} <= found
     issue = next(i for i in validate(inv, today=TODAY) if i.code == "FR-OPERATION-CATEGORY-MISSING")
-    assert issue.suggestion.startswith("PS")  # les lignes sont des prestations
+    assert issue.suggestion == "Prestation de services, code PS"  # les lignes sont des prestations
     assert issue.bt == "BT-23" and issue.rule == "BR-FR-08"
 
 
