@@ -44,6 +44,7 @@ class Decision(str, Enum):
 class Report(BaseModel):
     file: str | None = None
     source: str
+    ocr_engine: str | None = None
     backend: str
     invoice: Invoice
     confidence: dict[str, FieldConfidence] = Field(default_factory=dict)
@@ -120,12 +121,13 @@ def process(
     schematron: bool = False,
     force_ocr: bool = False,
     build_xml: bool = False,
+    ocr_engine: str | None = None,
 ) -> Result:
     """Traite une facture PDF et renvoie le rapport (et, sur demande, le XML et le PDF Factur-X)."""
     timings: dict[str, float] = {}
     t0 = time.perf_counter()
     pdf_bytes = pdf if isinstance(pdf, bytes) else Path(pdf).read_bytes()
-    doc = read_pdf(pdf_bytes, force_ocr=force_ocr)
+    doc = read_pdf(pdf_bytes, force_ocr=force_ocr, ocr_engine=ocr_engine)
     timings["read"] = (time.perf_counter() - t0) * 1000
 
     t1 = time.perf_counter()
@@ -141,6 +143,7 @@ def process(
     report = Report(
         file=None if isinstance(pdf, bytes) else str(pdf),
         source=doc.source,
+        ocr_engine=doc.ocr_engine,
         backend=ex.backend,
         invoice=ex.invoice,
         confidence=ex.confidence,

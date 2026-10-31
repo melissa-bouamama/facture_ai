@@ -104,6 +104,10 @@ def is_ocr_noise(text: str, conf: float) -> bool:
         return True
     if len(text) == 1 and not text.isdigit():  # lettre isolée dans sa propre cellule
         return True
+    if re.fullmatch(r"\d{1,2}(?:[.,]\d{1,2})?\s*%", text):
+        # un taux de TVA n'est jamais du bruit, même lu avec une confiance faible (le
+        # signe % l'est souvent) : il sera de toute façon vérifié par le calcul de la TVA
+        return False
     return len(text) <= 4 and conf < 0.75
 
 

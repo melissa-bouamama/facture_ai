@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import importlib.util
 import json
 import random
 from datetime import date
@@ -9,9 +8,10 @@ from decimal import Decimal
 import pytest
 
 from facturia.models import Address, Invoice, InvoiceLine, OperationCategory, Party, VatBreakdown
+from facturia.reader import available_ocr_engines
 from facturia.synth import generate_dataset, random_invoice, render_pdf
 
-HAS_OCR = importlib.util.find_spec("doctr") is not None
+HAS_OCR = bool(available_ocr_engines())
 
 
 @pytest.fixture

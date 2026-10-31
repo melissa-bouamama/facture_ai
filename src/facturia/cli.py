@@ -30,6 +30,8 @@ DECISION_LABEL = {
 
 
 SOURCE_LABEL = {"native": "PDF natif", "ocr": "scan lu par OCR", "mixed": "PDF mixte"}
+OCR_LABEL = {"tesseract": "Tesseract", "doctr": "docTR"}
+OCR_HELP = "Moteur OCR des scans : tesseract, doctr ou auto (défaut : FACTURIA_OCR, sinon auto)."
 ENGINE_LABEL = {
     "rules": "règles",
     "llm": "LLM",
@@ -51,7 +53,13 @@ def _print_report(report) -> None:
     console.print(
         Panel.fit(
             f"[{style}]{DECISION_LABEL[report.decision.value]}[/]\n"
-            f"Source : {SOURCE_LABEL.get(report.source, report.source)}. "
+            f"Source : {SOURCE_LABEL.get(report.source, report.source)}"
+            + (
+                f" ({OCR_LABEL.get(report.ocr_engine, report.ocr_engine)})"
+                if report.ocr_engine
+                else ""
+            )
+            + ". "
             f"Moteur : {ENGINE_LABEL.get(report.backend, report.backend)}. "
             f"Confiance moyenne : {report.mean_confidence * 100:.0f} %.\n"
             + "\n".join(f"• {r}" for r in report.decision_reasons),
@@ -114,11 +122,12 @@ def analyze(
     force_ocr: bool = typer.Option(
         False, "--ocr", help="Force l'OCR même si le PDF contient du texte."
     ),
+    ocr_engine: str | None = typer.Option(None, "--ocr-engine", help=OCR_HELP),
 ):
     """Extrait les données d'une facture et contrôle sa conformité."""
     from .pipeline import process
 
-    report = process(pdf, extractor=backend, force_ocr=force_ocr).report
+    report = process(pdf, extractor=backend, force_ocr=force_ocr, ocr_engine=ocr_engine).report
     payload = report.model_dump_json(indent=2)
     if out:
         out.write_text(payload, encoding="utf-8")
@@ -141,11 +150,14 @@ def convert(
     force: bool = typer.Option(
         False, "--force", help="Produit le Factur-X même si la facture doit être revue ou corrigée."
     ),
+    ocr_engine: str | None = typer.Option(None, "--ocr-engine", help=OCR_HELP),
 ):
     """Convertit une facture PDF en Factur-X (PDF + XML CII EN 16931 embarqué)."""
     from .pipeline import Decision, process
 
-    result = process(pdf, extractor=backend, facturx=True, schematron=schematron)
+    result = process(
+        pdf, extractor=backend, facturx=True, schematron=schematron, ocr_engine=ocr_engine
+    )
     report = result.report
     _print_report(report)
     if report.decision != Decision.READY and not force:

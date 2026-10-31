@@ -22,7 +22,7 @@ Une **erreur silencieuse** est une facture dont au moins un champ essentiel (num
 
 ## Résultats de l'extracteur à règles
 
-> **Note sur le moteur OCR** : les chiffres ci-dessous (colonnes « Scans », erreurs silencieuses, latence) ont été mesurés avec Tesseract. Le projet utilise désormais docTR (voir [architecture.md](architecture.md)), un moteur par réseaux de neurones plus robuste face aux scans bruités ou inclinés, mais avec un profil de vitesse différent sur CPU. Relancer `python bench/benchmark.py` republie des mesures à jour pour la voie scan ; les colonnes « PDF natifs » ne sont pas affectées par ce changement.
+Les chiffres de cette section ont été mesurés avec le moteur OCR Tesseract. La comparaison avec docTR suit.
 
 Machine : 2 cœurs Intel Xeon à 2,8 GHz, Python 3.13, sans GPU. Résultats complets dans [`bench/results/rules`](../bench/results/rules/).
 
@@ -57,6 +57,21 @@ Les règles ne connaissent pas ce vocabulaire et échouent, comme prévu. Mais *
 |---|---|---|
 | PDF natif | 40 ms | 66 ms |
 | Scan, avec redressement et OCR à 300 dpi | 2,6 s | 3,1 s |
+
+## Tesseract ou docTR : comparaison des moteurs OCR
+
+Les 61 scans des gabarits connus, lus par chaque moteur puis traités par le même extracteur à règles.
+
+| Moteur | Factures entièrement justes | Sans compter la ponctuation des désignations | Erreurs silencieuses | Envoyées en revue | Médiane par scan |
+|---|---|---|---|---|---|
+| Tesseract 5 (fra) | **96,7 %** | 96,7 % | **2** | 0 | 2,6 s |
+| docTR léger (`db_mobilenet_v3_large`, `crnn_mobilenet_v3_small`) | 45,9 % | 73,8 % | 13 | 32 | 2,3 s |
+
+Les montants, quantités et identifiants sont lus aussi bien par les deux moteurs. docTR perd en revanche les tirets isolés (« Formation Python - 2 jours » devient « Formation Python 2 jours »), ajoute des points parasites issus du bruit du scan, et ne peut pas écrire « œ », absent de son vocabulaire français (« main d'œuvre » devient « main d'ceuvre »). Les désignations comptant comme un champ essentiel, ces écarts deviennent des erreurs silencieuses.
+
+Sur une vraie facture d'hébergement scannée, les deux moteurs extraient les mêmes valeurs. docTR y obtient une meilleure confiance, car Tesseract colle un mot parasite au libellé de la date d'émission, ce qui envoie la facture en revue.
+
+Tesseract reste donc le moteur le plus fiable sur ce benchmark. docTR a l'avantage de s'installer entièrement en Python, sans binaire système.
 
 ## Ce que ces chiffres ne disent pas
 
