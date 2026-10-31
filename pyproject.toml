@@ -43,7 +43,7 @@ dev = [
 facturia = "facturia.cli:app"
 
 [project.urls]
-Homepage = "https://github.com/melissa-bouamama/factur-ia"
+Homepage = "https://github.com/melissa-bouamama/facture_ai"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/facturia"]

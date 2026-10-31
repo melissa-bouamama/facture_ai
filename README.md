@@ -1,6 +1,6 @@
 # factur-ia
 
-[![CI](https://github.com/melissa-bouamama/factur-ia/actions/workflows/ci.yml/badge.svg)](https://github.com/melissa-bouamama/factur-ia/actions/workflows/ci.yml)
+[![CI](https://github.com/melissa-bouamama/facture_ai/actions/workflows/ci.yml/badge.svg)](https://github.com/melissa-bouamama/facture_ai/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.10%20|%203.12-blue)
 ![Licence](https://img.shields.io/badge/licence-MIT-green)
 
@@ -10,7 +10,7 @@
 
 ## Démo
 
-**[Ouvrir la démo en ligne](https://melissa-bouamama.github.io/factur-ia/demo/)** (résultats précalculés), ou lancer l'application complète en local avec `facturia serve` puis ouvrir `http://localhost:8000`.
+**[Ouvrir la démo en ligne](https://melissa-bouamama.github.io/facture_ai/demo/)** (résultats précalculés), ou lancer l'application complète en local avec `facturia serve` puis ouvrir `http://localhost:8000`.
 
 <p align="center">
   <img src="docs/img/demo.png" width="92%" alt="Interface de démonstration : la facture à gauche, la fiche de contrôle tamponnée à droite">
@@ -65,7 +65,7 @@ Le second jeu utilise une mise en page et un vocabulaire **jamais vus** par les 
 ## Démarrage rapide
 
 ```bash
-git clone https://github.com/melissa-bouamama/factur-ia.git && cd factur-ia
+git clone https://github.com/melissa-bouamama/facture_ai.git && cd facture_ai
 pip install -e ".[ocr,api,schematron,bench]"    # plus tesseract avec la langue fra pour les scans
 
 facturia serve                                  # interface sur http://localhost:8000
