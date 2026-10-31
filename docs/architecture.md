@@ -4,7 +4,7 @@
 flowchart LR
     PDF[Facture PDF] --> R{Texte natif ?}
     R -- oui --> W[Mots et coordonnées<br/>pdfplumber]
-    R -- non --> D[Redressement<br/>profil de projection] --> O[OCR Tesseract fra]
+    R -- non --> D[Redressement<br/>profil de projection] --> O[OCR docTR<br/>détection + reconnaissance]
     O --> W
     W --> L[Reconstruction de la mise en page<br/>lignes, segments, cellules]
     L --> X1[Extracteur à règles<br/>libellés et position]
@@ -25,7 +25,7 @@ flowchart LR
 
 | Module | Rôle | Choix techniques |
 |---|---|---|
-| `reader.py` | PDF vers `Document` (pages, lignes, segments) | pdfplumber pour le natif. Pour les scans : rastérisation à 300 dpi, **estimation de l'inclinaison** par la variance du profil de projection, puis Tesseract en français. Les deux chemins produisent la même structure. |
+| `reader.py` | PDF vers `Document` (pages, lignes, segments) | pdfplumber pour le natif. Pour les scans : rastérisation à 300 dpi, **estimation de l'inclinaison** par la variance du profil de projection, puis OCR par docTR (détection `db_mobilenet_v3_large`, reconnaissance `crnn_mobilenet_v3_small`, vocabulaire français, 100 % Python). Les deux chemins produisent la même structure. |
 | `extract/rules.py` | Extraction déterministe | Recherche de libellés insensible aux accents. La valeur est cherchée dans la cellule, à sa droite ou en dessous. Les blocs client et livraison sont reconstruits par alignement de colonnes. Une ligne du tableau n'est acceptée que si quantité fois prix unitaire égale le montant. Une correction OCR (O lu pour 0, l pour 1) n'est appliquée **que si la clé de contrôle la confirme**. |
 | `extract/llm.py` | Extraction par LLM | API compatible OpenAI (Ollama, vLLM, Mistral, OpenAI). Sortie contrainte par un schéma JSON, repli sur le mode JSON simple, température nulle et une tentative de réparation du JSON. **Ancrage** : identifiants, IBAN et montants doivent apparaître dans le texte du document. |
 | `extract/hybrid.py` | Orchestration | Les règles d'abord, le LLM seulement si la validation révèle un doute. Fusion champ par champ : quand les deux lectures concordent, la confiance augmente. Quand elles divergent, la valeur la plus sûre l'emporte. Montants et lignes sont repris **en bloc** depuis la source arithmétiquement cohérente. Si le LLM tombe en panne, les règles prennent le relais sans erreur. |

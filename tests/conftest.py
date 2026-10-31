@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import random
-import shutil
 from datetime import date
 from decimal import Decimal
 
@@ -11,7 +11,7 @@ import pytest
 from facturia.models import Address, Invoice, InvoiceLine, OperationCategory, Party, VatBreakdown
 from facturia.synth import generate_dataset, random_invoice, render_pdf
 
-HAS_TESSERACT = shutil.which("tesseract") is not None
+HAS_OCR = importlib.util.find_spec("doctr") is not None
 
 
 @pytest.fixture

@@ -10,7 +10,7 @@ from facturia.pipeline import Decision, process
 from facturia.reader import read_pdf
 from facturia.synth import HELDOUT_TEMPLATES, random_invoice, render_pdf, simulate_scan
 
-from .conftest import HAS_TESSERACT, load_gold
+from .conftest import HAS_OCR, load_gold
 
 
 def _get(inv, path):
@@ -51,7 +51,7 @@ def test_unknown_layout_is_routed_to_review_not_silently_wrong():
 
 
 @pytest.mark.slow
-@pytest.mark.skipif(not HAS_TESSERACT, reason="tesseract absent")
+@pytest.mark.skipif(not HAS_OCR, reason="extra ocr absent")
 def test_scanned_invoice_goes_through_ocr():
     rng = random.Random(3)
     inv, spec = random_invoice(rng, ["classique"])

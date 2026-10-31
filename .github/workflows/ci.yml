@@ -17,8 +17,11 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-      - name: Tesseract (OCR français)
-        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr tesseract-ocr-fra
+      - name: Cache des poids docTR
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/doctr
+          key: doctr-weights-${{ runner.os }}
       - name: Dépendances
         run: pip install -e ".[dev]"
       - name: Lint

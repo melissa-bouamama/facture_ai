@@ -22,6 +22,8 @@ Une **erreur silencieuse** est une facture dont au moins un champ essentiel (num
 
 ## Résultats de l'extracteur à règles
 
+> **Note sur le moteur OCR** : les chiffres ci-dessous (colonnes « Scans », erreurs silencieuses, latence) ont été mesurés avec Tesseract. Le projet utilise désormais docTR (voir [architecture.md](architecture.md)), un moteur par réseaux de neurones plus robuste face aux scans bruités ou inclinés, mais avec un profil de vitesse différent sur CPU. Relancer `python bench/benchmark.py` republie des mesures à jour pour la voie scan ; les colonnes « PDF natifs » ne sont pas affectées par ce changement.
+
 Machine : 2 cœurs Intel Xeon à 2,8 GHz, Python 3.13, sans GPU. Résultats complets dans [`bench/results/rules`](../bench/results/rules/).
 
 ### Gabarits connus : 200 factures, dont 61 scannées

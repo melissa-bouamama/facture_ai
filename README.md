@@ -32,7 +32,7 @@ Une grande partie des PME va donc devoir passer, en moins d'un an, de « je gén
 
 ## Ce que fait factur-ia
 
-1. **Lit** le PDF : texte natif, ou **OCR** (Tesseract en français) après redressement automatique du scan.
+1. **Lit** le PDF : texte natif, ou **OCR** par réseaux de neurones (docTR, détection et reconnaissance, 100 % Python) après redressement automatique du scan.
 2. **Reconstruit la mise en page** (lignes, colonnes, cellules) pour ne pas mélanger le bloc du vendeur et celui du client.
 3. **Extrait** les données au format EN 16931 avec trois moteurs au choix :
    * **règles** : déterministe et explicable, environ 40 ms par facture native.
@@ -53,6 +53,8 @@ Une grande partie des PME va donc devoir passer, en moins d'un an, de « je gén
 
 Benchmark reproductible (`python bench/benchmark.py`) sur des factures synthétiques avec vérité terrain. Détail et limites dans **[docs/evaluation.md](docs/evaluation.md)**.
 
+> Chiffres mesurés avec le moteur OCR Tesseract. Le passage à docTR (voir « Choix techniques ») change la voie scan ; relancer `python bench/benchmark.py` republie des mesures à jour pour cette ligne.
+
 | | Gabarits connus (200 factures, 30 % scannées) | Gabarit inconnu (60 factures) |
 |---|---|---|
 | Factures extraites sans aucune erreur sur 15 champs | **99,0 %** | 0 % |
@@ -68,8 +70,7 @@ Le second jeu utilise une mise en page et un vocabulaire **jamais vus** par les 
 git clone https://github.com/melissa-bouamama/facture_ai.git && cd facture_ai
 
 python3 -m venv venv && source venv/bin/activate   # évite l'erreur « externally managed environment »
-sudo apt-get install -y tesseract-ocr tesseract-ocr-fra   # OCR des scans (macOS : brew install tesseract tesseract-lang)
-pip install -e ".[ocr,api,schematron,bench]"
+pip install -e ".[ocr,api,schematron,bench]"    # OCR 100 % Python (docTR), aucun binaire système à installer
 
 facturia serve                                  # interface sur http://localhost:8000
 facturia analyze examples/corriger.pdf          # rapport de conformité dans le terminal
@@ -137,6 +138,7 @@ Les modules et les choix sont détaillés dans **[docs/architecture.md](docs/arc
 | Ancrage des sorties du LLM | En finance, une valeur inventée est pire qu'une valeur manquante. Tout identifiant ou montant doit apparaître dans le document. |
 | Clés de contrôle partout | Luhn pour le SIREN et le SIRET, clé de TVA, mod 97 pour l'IBAN. Elles valident la facture et corrigent l'OCR (O lu à la place de 0, l à la place de 1) sans risque. |
 | Schematrons officiels exécutés en Python | Le XML est vérifié par les mêmes règles BR-FR que celles des plateformes, avec SaxonC-HE et sans serveur Java. |
+| OCR par réseaux de neurones (docTR), pas Tesseract | Modèles de détection et de reconnaissance entraînés sur du français, plus robustes qu'une approche classique face à un scan bruité ou incliné. Entièrement en Python : pas de binaire système à installer, ni de dépendance à la distribution Linux de la machine. |
 | Décision à trois états | Une incohérence peut venir de la facture ou de l'OCR. Dans le doute, une personne tranche. La métrique suivie est le nombre d'erreurs **silencieuses**. |
 | LLM local par défaut | Les factures contiennent des données sensibles (secret des affaires, RGPD). L'inférence reste dans l'infrastructure. |
 | Données synthétiques et jeu inconnu | Il n'existe pas de base publique de factures françaises annotées. Le générateur rend le benchmark reproductible, et le gabarit inconnu empêche de se raconter des histoires. |

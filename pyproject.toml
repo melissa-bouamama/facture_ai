@@ -29,7 +29,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-ocr = ["pytesseract>=0.3.10", "pillow>=10.0", "numpy>=1.26"]
+ocr = ["python-doctr>=1.0", "pillow>=10.0", "numpy>=1.26"]
 api = ["fastapi>=0.110", "uvicorn>=0.29", "python-multipart>=0.0.9"]
 schematron = ["saxonche>=12.4"]
 bench = ["reportlab>=4.0", "pillow>=10.0", "numpy>=1.26"]

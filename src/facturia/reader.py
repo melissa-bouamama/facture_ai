@@ -2,8 +2,10 @@
 
 Deux chemins d'entrée :
 - PDF natif : les mots et leurs coordonnées sont lus directement (pdfplumber).
-- PDF scanné : la page est rastérisée puis passée à Tesseract (fra+eng), qui renvoie
-  aussi des boîtes englobantes et une confiance par mot.
+- PDF scanné : la page est rastérisée puis passée à docTR (détection + reconnaissance
+  par réseaux de neurones), qui renvoie aussi des boîtes englobantes et une confiance
+  par mot. Moteur 100 % Python : pas de binaire système à installer, et des modèles
+  nettement plus robustes que Tesseract sur les scans bruités ou inclinés.
 
 Dans les deux cas on obtient la même structure (`Document` → `Page` → `Line` →
 `Segment`), ce qui permet au reste du pipeline d'ignorer l'origine du texte.
@@ -18,6 +20,7 @@ import io
 import logging
 import statistics
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 
 import pdfplumber
@@ -26,6 +29,9 @@ log = logging.getLogger(__name__)
 
 MIN_NATIVE_CHARS = 40  # en dessous, la page est considérée comme scannée
 OCR_DPI = 300
+# Architectures légères (CPU) : détection par segmentation + reconnaissance CRNN.
+OCR_DET_ARCH = "db_mobilenet_v3_large"
+OCR_RECO_ARCH = "crnn_mobilenet_v3_small"
 
 
 @dataclass
@@ -180,40 +186,58 @@ def estimate_skew(image, max_angle: float = 3.0, step: float = 0.1) -> float:
     return round(best_angle, 2)
 
 
-def _ocr_words(page: pdfplumber.page.Page, lang: str = "fra+eng") -> list[Word]:
+@lru_cache(maxsize=1)
+def _ocr_model():
+    """Charge le modèle docTR une seule fois par processus (poids mis en cache localement)."""
     try:
-        import pytesseract
+        from doctr.models import ocr_predictor
     except ImportError as exc:  # pragma: no cover - dépend de l'installation
         raise RuntimeError(
-            "PDF scanné détecté : installez l'extra OCR (pip install 'factur-ia[ocr]') "
-            "et le binaire tesseract avec la langue 'fra'."
+            "PDF scanné détecté : installez l'extra OCR (pip install 'factur-ia[ocr]')."
         ) from exc
+    return ocr_predictor(
+        det_arch=OCR_DET_ARCH,
+        reco_arch=OCR_RECO_ARCH,
+        pretrained=True,
+        assume_straight_pages=True,
+    )
 
+
+def _ocr_words(page: pdfplumber.page.Page) -> list[Word]:
+    import numpy as np
     from PIL import Image
 
-    image = page.to_image(resolution=OCR_DPI).original.convert("L")
-    angle = estimate_skew(image)
+    image = page.to_image(resolution=OCR_DPI).original.convert("RGB")
+    angle = estimate_skew(image.convert("L"))
     if abs(angle) >= 0.1:
         log.info("redressement de %.1f°", angle)
-        image = image.rotate(angle, resample=Image.BICUBIC, fillcolor=255)
-    data = pytesseract.image_to_data(
-        image, lang=lang, config="--psm 3", output_type=pytesseract.Output.DICT
-    )
-    scale = 72.0 / OCR_DPI
-    words = []
-    for i, text in enumerate(data["text"]):
-        text = (text or "").strip()
-        conf = float(data["conf"][i])
-        if not text or conf < 0:
-            continue
-        x, y, w, h = (data[k][i] * scale for k in ("left", "top", "width", "height"))
-        words.append(Word(text, x, x + w, y, y + h, conf=conf / 100.0))
+        image = image.rotate(angle, resample=Image.BICUBIC, fillcolor=(255, 255, 255))
+
+    result = _ocr_model()([np.asarray(image)])
+    page_w, page_h = float(page.width), float(page.height)
+
+    words: list[Word] = []
+    for block in result.pages[0].blocks:
+        for line in block.lines:
+            for w in line.words:
+                text = w.value.strip()
+                if not text:
+                    continue
+                (x0, y0), (x1, y1) = w.geometry
+                words.append(
+                    Word(
+                        text,
+                        x0 * page_w,
+                        x1 * page_w,
+                        y0 * page_h,
+                        y1 * page_h,
+                        conf=float(w.confidence),
+                    )
+                )
     return words
 
 
-def read_pdf(
-    source: str | Path | bytes, force_ocr: bool = False, ocr_lang: str = "fra+eng"
-) -> Document:
+def read_pdf(source: str | Path | bytes, force_ocr: bool = False) -> Document:
     """Lit un PDF (chemin ou octets) et renvoie un `Document` structuré."""
     stream = io.BytesIO(source) if isinstance(source, bytes) else source
     pages: list[Page] = []
@@ -223,7 +247,7 @@ def read_pdf(
             words = [] if force_ocr else _native_words(p)
             if force_ocr or sum(len(w.text) for w in words) < MIN_NATIVE_CHARS:
                 log.info("page %d : texte natif insuffisant, passage en OCR", i)
-                words = _ocr_words(p, lang=ocr_lang)
+                words = _ocr_words(p)
                 kinds.add("ocr")
             else:
                 kinds.add("native")
