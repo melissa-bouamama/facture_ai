@@ -66,7 +66,10 @@ Le second jeu utilise une mise en page et un vocabulaire **jamais vus** par les 
 
 ```bash
 git clone https://github.com/melissa-bouamama/facture_ai.git && cd facture_ai
-pip install -e ".[ocr,api,schematron,bench]"    # plus tesseract avec la langue fra pour les scans
+
+python3 -m venv venv && source venv/bin/activate   # évite l'erreur « externally managed environment »
+sudo apt-get install -y tesseract-ocr tesseract-ocr-fra   # OCR des scans (macOS : brew install tesseract tesseract-lang)
+pip install -e ".[ocr,api,schematron,bench]"
 
 facturia serve                                  # interface sur http://localhost:8000
 facturia analyze examples/corriger.pdf          # rapport de conformité dans le terminal
