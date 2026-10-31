@@ -22,7 +22,7 @@ from .extract import CORE_FIELDS, Extractor, get_extractor
 from .extract.base import label
 from .models import FieldConfidence, Invoice
 from .reader import read_pdf
-from .validate import Issue, Severity, fine_exposure, validate
+from .validate import Issue, Severity, buyer_is_individual, fine_exposure, validate
 
 REVIEW_THRESHOLD = 0.8
 FIELD_FLOOR = 0.6
@@ -164,7 +164,15 @@ def process(
         if result.xml is not None:
             from .export.schematron import check_xml
 
-            xml_report = check_xml(result.xml, schematron=schematron)
+            # Les règles BR-FR encadrent la facturation électronique entre entreprises :
+            # pour un client particulier, seul le socle européen EN 16931 s'applique.
+            which = ("en16931",) if buyer_is_individual(ex.invoice.buyer) else ("en16931", "br-fr")
+            if schematron and len(which) == 1:
+                report.notes.append(
+                    "Client particulier : le XML est vérifié selon la norme EN 16931, les règles "
+                    "françaises BR-FR ne visant que les factures entre entreprises."
+                )
+            xml_report = check_xml(result.xml, schematron=schematron, which=which)
             report.xml_valid = xml_report.valid if schematron else xml_report.xsd_valid
             report.xml_failures = xml_report.failures
             report.schematrons_run = xml_report.schematron_run

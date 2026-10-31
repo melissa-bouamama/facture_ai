@@ -12,6 +12,7 @@ from decimal import Decimal
 
 from lxml import etree
 
+from .. import identifiers as ids
 from ..models import Address, Invoice, Party
 from ..normalize import money
 
@@ -75,7 +76,7 @@ def _address(parent, tag: str, addr: Address) -> None:
 
 def _party(parent, tag: str, p: Party, with_vat: bool = True) -> None:
     el = _sub(parent, tag)
-    if p.siret:
+    if p.siret and ids.is_valid_siret(p.siret):  # un SIRET mal imprimé est signalé, pas exporté
         _sub(el, "ram:GlobalID", p.siret, schemeID="0009")
     _sub(el, "ram:Name", p.name or "")
     if p.siren:
@@ -210,10 +211,9 @@ def build_cii(inv: Invoice) -> bytes:
     _sub(summ, "ram:TaxBasisTotalAmount", _amount(basis))
     _sub(summ, "ram:TaxTotalAmount", _amount(tax_total), currencyID=inv.currency)
     _sub(summ, "ram:GrandTotalAmount", _amount(grand))
-    _sub(
-        summ,
-        "ram:DuePayableAmount",
-        _amount(inv.amount_due if inv.amount_due is not None else grand),
-    )
+    due = inv.amount_due if inv.amount_due is not None else grand
+    if money(due) < money(grand):  # facture déjà réglée en tout ou partie (BT-113)
+        _sub(summ, "ram:TotalPrepaidAmount", _amount(grand - due))
+    _sub(summ, "ram:DuePayableAmount", _amount(due))
 
     return etree.tostring(root, xml_declaration=True, encoding="UTF-8", pretty_print=True)

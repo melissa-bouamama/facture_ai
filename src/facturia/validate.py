@@ -17,7 +17,7 @@ from enum import Enum
 from pydantic import BaseModel
 
 from . import identifiers as ids
-from .models import Invoice, OperationCategory
+from .models import Invoice, OperationCategory, Party
 from .normalize import money
 
 FINE_PER_MENTION = Decimal("15")  # CGI art. 1737, II
@@ -49,6 +49,36 @@ class Issue(BaseModel):
     rule: str | None = None
     fine_eur: Decimal | None = None
     suggestion: str | None = None
+
+
+COMPANY_MARKERS = re.compile(
+    r"\b(?:sas|sasu|sarl|eurl|sa|snc|sci|scop|scm|selarl|selas|eirl|gie|sem|soci[eé]t[eé]|"
+    r"association|ets|[eé]tablissements?|cabinet|groupe?|holding|ltd|inc|gmbh|llc|bv|spa|srl)\b",
+    re.IGNORECASE,
+)
+CIVILITY = re.compile(r"^(?:m\.|mr\.?|mme|mlle|monsieur|madame|mademoiselle)\s+", re.IGNORECASE)
+
+
+def buyer_is_individual(buyer: Party) -> bool:
+    """Client probablement particulier : aucun identifiant d'entreprise, pas de forme
+    juridique, et un nom de personne écrit à la française (« DUPONT Marie », « Mme Dupont »).
+
+    Volontairement prudent : « Marie Dupont » sans majuscules ne suffit pas, et dans le
+    doute les règles B2B s'appliquent.
+    """
+    if not buyer.name or buyer.siren or buyer.siret or buyer.vat_id:
+        return False
+    name = buyer.name.strip()
+    if COMPANY_MARKERS.search(name):
+        return False
+    if CIVILITY.match(name):
+        return True
+    words = name.split()
+    if not 2 <= len(words) <= 4 or not all(re.fullmatch(r"[A-Za-zÀ-ÿ'’-]+", w) for w in words):
+        return False
+    family = [w for w in words if len(w) >= 2 and w.isupper()]
+    given = [w for w in words if w[0].isupper() and w[1:].islower()]
+    return bool(family) and bool(given)
 
 
 def guess_category(inv: Invoice) -> OperationCategory | None:
@@ -86,6 +116,9 @@ def validate(inv: Invoice, today: date | None = None) -> list[Issue]:
         )
 
     E, W, INFO = Severity.ERROR, Severity.WARNING, Severity.INFO
+    # Client particulier : la facture électronique obligatoire et les mentions du Code de
+    # commerce (L441-9) ne concernent que les échanges entre professionnels.
+    b2c = buyer_is_individual(inv.buyer)
 
     # --- identification de la facture
     if not inv.number:
@@ -184,6 +217,16 @@ def validate(inv: Invoice, today: date | None = None) -> list[Issue]:
             "BR-FR-10",
             fine=True,
         )
+    if s.siret and not ids.is_valid_siret(s.siret):
+        n = len(ids.digits_only(s.siret))
+        add(
+            "FR-SELLER-SIRET-INVALID",
+            W,
+            f"SIRET du vendeur {s.siret} invalide : "
+            + (f"{n} chiffres au lieu de 14." if n != 14 else "clé de contrôle incorrecte."),
+            "seller.siret",
+            "BT-29",
+        )
     if s.siret and s.siren and ids.digits_only(s.siret)[:9] != s.siren:
         add(
             "FR-SELLER-SIRET-INCOHERENT",
@@ -236,7 +279,18 @@ def validate(inv: Invoice, today: date | None = None) -> list[Issue]:
             "BR-07",
             fine=True,
         )
-    if not b.siren:
+    if not b.siren and b2c:
+        add(
+            "B2C-BUYER-INDIVIDUAL",
+            W,
+            "Client apparemment particulier : nom de personne, ni SIREN ni forme juridique. "
+            "La facture électronique obligatoire ne concerne que les échanges entre entreprises, "
+            "donc le SIREN du client, la catégorie d'opération et les mentions de pénalités ne "
+            "sont pas exigés. Si le client est une entreprise, ajoutez son SIREN.",
+            "buyer.siren",
+            "BT-47",
+        )
+    elif not b.siren:
         add(
             "FR-BUYER-SIREN-MISSING",
             E,
@@ -266,7 +320,7 @@ def validate(inv: Invoice, today: date | None = None) -> list[Issue]:
         )
 
     # --- nouvelles mentions 2026
-    if inv.operation_category is None:
+    if inv.operation_category is None and not b2c:
         guess = guess_category(inv)
         add(
             "FR-OPERATION-CATEGORY-MISSING",
@@ -303,7 +357,7 @@ def validate(inv: Invoice, today: date | None = None) -> list[Issue]:
         )
 
     # --- mentions légales B2B (Code de commerce L441-9, notes PMD/PMT/AAB)
-    if not inv.late_penalty_note:
+    if not b2c and not inv.late_penalty_note:
         add(
             "FR-NOTE-PENALTIES-MISSING",
             E,
@@ -312,7 +366,7 @@ def validate(inv: Invoice, today: date | None = None) -> list[Issue]:
             "BT-22",
             "BR-FR-05 (PMD)",
         )
-    if not inv.recovery_fee_note:
+    if not b2c and not inv.recovery_fee_note:
         add(
             "FR-NOTE-RECOVERY-FEE-MISSING",
             E,
@@ -321,7 +375,7 @@ def validate(inv: Invoice, today: date | None = None) -> list[Issue]:
             "BT-22",
             "BR-FR-05 (PMT)",
         )
-    if not inv.discount_note:
+    if not b2c and not inv.discount_note:
         add(
             "FR-NOTE-DISCOUNT-MISSING",
             E,

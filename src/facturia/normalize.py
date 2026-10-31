@@ -104,9 +104,11 @@ def parse_rate(text: str | None) -> Decimal | None:
     m = re.search(r"(\d{1,2}(?:[.,]\d{1,2})?)\s*%", str(text))
     raw = m.group(1) if m else str(text).strip().rstrip("%")
     try:
-        return Decimal(raw.replace(",", ".")).normalize()
+        rate = Decimal(raw.replace(",", ".")).normalize()
     except InvalidOperation:
         return None
+    # « 10 » plutôt que « 1E+1 » une fois sérialisé dans le rapport JSON
+    return rate.quantize(Decimal(1)) if rate == rate.to_integral_value() else rate
 
 
 def fmt_amount(value: Decimal | None) -> str:

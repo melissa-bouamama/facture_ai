@@ -39,7 +39,7 @@ Une grande partie des PME va donc devoir passer, en moins d'un an, de « je gén
    * **LLM** : n'importe quel modèle compatible avec l'API OpenAI, **local par défaut** (Ollama, vLLM) pour que les factures ne quittent pas l'entreprise.
    * **hybride** : les règles d'abord, le LLM **seulement en cas de doute** pour maîtriser le coût, avec une fusion champ par champ.
 4. **Refuse les hallucinations** : un SIREN, un IBAN ou un montant renvoyé par le LLM n'est gardé que s'il passe sa clé de contrôle **et** figure réellement dans le document.
-5. **Contrôle la conformité** avec 34 règles reliées aux champs EN 16931 (BT, BG) et aux règles françaises BR-FR, propose une correction et estime l'amende encourue.
+5. **Contrôle la conformité** avec 36 règles reliées aux champs EN 16931 (BT, BG) et aux règles françaises BR-FR, propose une correction et estime l'amende encourue. Un client particulier n'est pas soumis aux obligations réservées aux entreprises.
 6. **Décide** : prête à émettre, à corriger chez l'émetteur, ou à relire par une personne quand la lecture est incertaine.
 7. **Génère** le XML CII et le PDF Factur-X, validés par le **XSD officiel** et les **schematrons EN 16931 et BR-FR**.
 
@@ -160,7 +160,7 @@ src/facturia/
 │   ├── rules.py      extraction guidée par la mise en page
 │   ├── llm.py        LLM compatible OpenAI, sortie contrainte, ancrage
 │   └── hybrid.py     escalade conditionnelle et fusion
-├── validate.py       34 contrôles EN 16931, BR-FR et réforme 2026
+├── validate.py       36 contrôles EN 16931, BR-FR et réforme 2026
 ├── export/           XML CII, schematrons, PDF Factur-X
 ├── pipeline.py       de bout en bout, avec la décision
 ├── api.py            API FastAPI et interface de démo
@@ -171,7 +171,7 @@ src/facturia/
 bench/                benchmark reproductible et résultats
 examples/             PDF d'entrée, rapports JSON, Factur-X produits
 docs/                 marché, architecture, conformité, évaluation, démo en ligne
-tests/                50 tests, dont les schematrons officiels et un LLM simulé
+tests/                59 tests, dont les schematrons officiels, un LLM simulé et une mise en page de facture réelle
 ```
 
 ## Licence

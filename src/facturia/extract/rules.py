@@ -61,10 +61,25 @@ L_TVA_RATE = _rx(
 L_TVA_TOTAL = _rx(r"total\s*t\.?\s*v\.?\s*a|montant\s*(?:total\s*)?(?:de\s*la\s*)?tva\b(?!\s*\d)")
 L_TTC = _rx(r"total\s*t\.?\s*t\.?\s*c|montant\s*t\.?\s*t\.?\s*c|toutes\s*taxes\s*comprises")
 L_DUE_AMOUNT = _rx(
-    r"net\s*[aà]\s*payer|reste\s*[aà]\s*payer|montant\s*[aà]\s*r[eé]gler|solde\s*d[uû]"
+    r"net\s*[aà]\s*payer|reste\s*[aà]\s*payer|montant\s*[aà]\s*r[eé]gler|solde\s*d[uû]|^solde\b"
+)
+# Raison sociale annoncée par un libellé (« Nom de la société : Tilleuls Hôtellerie »), fréquent sur les
+# factures produites par des logiciels de gestion (hôtellerie, caisse, ERP).
+L_SELLER_NAME = _rx(
+    r"^(?:nom\s*de\s*(?:la\s*)?soci[eé]t[eé]|raison\s*sociale|d[eé]nomination(?:\s*sociale)?)\s*[:.]?\s*"
+)
+# Numéro porté par le titre lui-même : « FACTURE 2025117 », « Facture n° FA-12 ».
+RX_TITLE_NUMBER = _rx(
+    r"^(?:facture|invoice)\s*(?:n[°o]\.?\s*)?[:#]?\s*([a-z0-9][\w\-/.]*\d[\w\-/]*)\s*$"
 )
 H_DESC = _rx(r"d[eé]signation|description|libell[eé]|article|prestation")
 H_AMOUNT = _rx(r"total|montant")
+H_QTY = _rx(r"quantit[eé]|\bqt[eé]s?\b|\bqte\b")
+H_PRICE = _rx(r"\bprix|\bp\.?\s*u\b|unitaire")
+# Cellule de TVA par unité suivie du taux : « 5,00 € (10%) »
+RX_VAT_IN_CELL = re.compile(r"^\s*[\d\s.,]*\s*€?\s*\(\s*(\d{1,2}(?:[.,]\d{1,2})?)\s*%\s*\)\s*$")
+RX_DATE_CELL = re.compile(r"^\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}$")
+RX_LONG_DIGITS = re.compile(r"(?<![\d])(\d(?:\s?\d){12,14})(?![\d])")
 
 RX_SIRET = re.compile(r"(?<!\d)(\d{3}\s?\d{3}\s?\d{3}\s?\d{5})(?!\d)")
 RX_SIREN = re.compile(r"(?<![\d\w])(\d{3}\s?\d{3}\s?\d{3})(?![\d])")
@@ -176,6 +191,19 @@ class RulesExtractor:
             v = parser(line.segments[pos.seg + 1].text)
             if v is not None:
                 return v, "right"
+        # Valeur à droite mais légèrement décalée vers le bas (police différente du libellé) :
+        # la reconstruction l'a placée sur la ligne suivante, avant la cellule voisine.
+        if pos.line + 1 < len(self.lines):
+            below = self.lines[pos.line + 1]
+            limit = (
+                line.segments[pos.seg + 1].x0 if pos.seg + 1 < len(line.segments) else float("inf")
+            )
+            if below.top - seg.top <= 0.8 * max(seg.bottom - seg.top, 6.0):
+                for s in below.segments:
+                    if seg.x1 - 2 <= s.x0 and s.x1 <= limit + 2:
+                        v = parser(s.text)
+                        if v is not None:
+                            return v, "right"
         if pos.line + 1 < len(self.lines):
             for s in self.lines[pos.line + 1].segments:
                 if s.x0 <= seg.x1 + 5 and s.x1 >= seg.x0 - 5:
@@ -203,6 +231,17 @@ class RulesExtractor:
                 inv.number = v
                 ex.set("number", self._conf(0.95 if how == "same" else 0.9), f"rules:label-{how}")
                 break
+        if inv.number is None:  # numéro dans le titre : « FACTURE 2025117 »
+            for ln in self.lines[:6]:
+                for seg in ln.segments:
+                    m = RX_TITLE_NUMBER.match(fold(seg.text).strip())
+                    if m:
+                        start = len(seg.text) - len(seg.text.lstrip())
+                        inv.number = seg.text[start + m.start(1) : start + m.end(1)]
+                        ex.set("number", self._conf(0.85), "rules:title")
+                        break
+                if inv.number:
+                    break
 
         def parse_d(text: str) -> date | None:
             ds = find_dates(text)
@@ -252,7 +291,10 @@ class RulesExtractor:
     def _is_label(self, seg: Segment) -> bool:
         t = fold(seg.text)
         return (
-            any(rx.search(t) for rx in (L_NUMBER, L_DUE, L_BUYER, L_DELIVERY, L_HT, L_TTC))
+            any(
+                rx.search(t)
+                for rx in (L_NUMBER, L_DUE, L_BUYER, L_DELIVERY, L_HT, L_TTC, L_SELLER_NAME)
+            )
             or (bool(H_DESC.search(t)) and len(t) < 25)
             or bool(re.match(r"^date\b", t))
             or bool(re.match(r"^cat[eé]gorie", t))
@@ -270,7 +312,9 @@ class RulesExtractor:
         for i in range(line_idx + 1, min(line_idx + 1 + max_lines, len(self.lines))):
             cand = [s for s in self.lines[i].segments if abs(s.x0 - anchor.x0) <= 14]
             if not cand:
-                break
+                # ligne d'une autre colonne intercalée (ex. une date un peu plus basse que son
+                # libellé) : on continue, l'écart vertical ci-dessous borne toujours le bloc
+                continue
             s = cand[0]
             if s.top - last_bottom > 1.9 * height or self._is_label(s):
                 break
@@ -350,6 +394,17 @@ class RulesExtractor:
                 top_conf = self._block_conf.get(name, self.ocr_factor)
                 inv.seller.address = addr
             break
+        # Raison sociale annoncée par un libellé : prioritaire sur le bloc du haut (souvent un logo)
+        labeled = None
+        for pos, _seg, m in self._find_label(L_SELLER_NAME):
+            if buyer_rng and buyer_rng[0] <= pos.line <= buyer_rng[1]:
+                continue
+            labeled, how = self._value_near(pos, m, self._parse_name)
+            if labeled:
+                inv.seller.name = labeled
+                ex.set("seller.name", self._conf(0.9), f"rules:label-{how}")
+                return buyer_rng, delivery_rng
+
         # Recoupement avec le pied de page légal (raison sociale + RCS) : la source la plus fiable
         footer_name = self._footer_name()
         same = (
@@ -376,13 +431,23 @@ class RulesExtractor:
 
     @staticmethod
     def _is_title(text: str) -> bool:
-        return re.sub(r"[\s.]", "", fold(text)) in {
+        t = fold(text).strip()
+        return re.sub(r"[\s.]", "", t) in {
             "facture",
             "invoice",
             "avoir",
             "factured'avoir",
             "devis",
-        }
+        } or bool(RX_TITLE_NUMBER.match(t))
+
+    def _parse_name(self, text: str) -> str | None:
+        """Valeur plausible pour une raison sociale : du texte, pas un libellé ni un nombre."""
+        t = text.strip(" :.-\t")
+        if not 2 <= len(t) <= 80 or sum(c.isalpha() for c in t) < 2:
+            return None
+        if any(rx.search(fold(t)) for rx in (L_SELLER_NAME, L_BUYER, L_NUMBER, ID_CONTEXT)):
+            return None
+        return t
 
     def _footer_name(self) -> str | None:
         for ln in reversed(self.lines):
@@ -401,10 +466,13 @@ class RulesExtractor:
             return rng is not None and rng[0] <= i <= rng[1]
 
         seller_sirens: list[tuple[str, float]] = []
+        bad_siret = None
         for i, ln in enumerate(self.lines):
+            prev_ft = ""
             for seg in ln.segments:
                 t = repair_ocr_ids(seg.text)
                 ft = fold(t)
+                label_ft, prev_ft = prev_ft, ft  # libellé éventuel dans la cellule de gauche
                 if "iban" in ft or "bic" in ft:
                     continue
                 buyer_side = in_rng(i, buyer_rng) or in_rng(i, delivery_rng)
@@ -419,8 +487,14 @@ class RulesExtractor:
                                 self._conf(0.95),
                                 "rules:checksum",
                             )
-                if not ID_CONTEXT.search(ft):
+                if not (ID_CONTEXT.search(ft) or ID_CONTEXT.search(label_ft)):
                     continue
+                if "siret" in ft + " " + label_ft and not buyer_side and bad_siret is None:
+                    # SIRET imprimé avec un mauvais nombre de chiffres ou une clé fausse
+                    for m in RX_LONG_DIGITS.finditer(t):
+                        digits = ids.digits_only(m.group(1))
+                        if not ids.is_valid_siret(digits):
+                            bad_siret = digits
                 for m in RX_SIRET.finditer(t):
                     siret = ids.digits_only(m.group(1))
                     if ids.is_valid_siret(siret):
@@ -443,6 +517,8 @@ class RulesExtractor:
                             ex.set("buyer.siren", self._conf(0.95), "rules:checksum")
                     else:
                         seller_sirens.append((siren, 0.95))
+        if inv.seller.siret is None and bad_siret:
+            inv.seller.siret = bad_siret  # signalé par la validation, jamais exporté
         # SIREN implicite dans le n° de TVA
         if inv.seller.vat_id and ids.is_valid_fr_vat(inv.seller.vat_id):
             seller_sirens.append((inv.seller.vat_id[-9:], 0.85))
@@ -469,14 +545,24 @@ class RulesExtractor:
         has_ref = False
         for i, ln in enumerate(self.lines):
             t = fold(ln.text)
-            if H_DESC.search(t) and H_AMOUNT.search(t) and len(ln.segments) >= 2:
+            classic = H_DESC.search(t) and H_AMOUNT.search(t) and len(ln.segments) >= 2
+            # tableau sans colonne de désignation : « Prix HT | Quantité | Total »
+            priced = (H_QTY.search(t) and H_PRICE.search(t) and H_AMOUNT.search(t)) and len(
+                ln.segments
+            ) >= 3
+            if classic or priced:
                 header_idx = i
                 has_ref = bool(re.search(r"\bref", t))
                 break
         if header_idx is None:
             ex.notes.append("tableau des lignes non trouvé")
             return
-        has_vat_col = bool(re.search(r"\btva\b|\btaux\b", fold(self.lines[header_idx].text)))
+        header_text = fold(self.lines[header_idx].text)
+        has_vat_col = bool(re.search(r"\btva\b|\btaux\b", header_text))
+        # Colonnes TTC (prix ou total) : les rôles se lisent dans l'en-tête, sinon on
+        # confondrait le prix TTC et la quantité, dont le produit donne aussi le total.
+        anchors = self._header_anchors(self.lines[header_idx]) if "ttc" in header_text else []
+        caption = self._caption_above(header_idx)
 
         rows: list[InvoiceLine] = []
         pending_desc: list[str] = []
@@ -495,13 +581,18 @@ class RulesExtractor:
                         pending_desc.append(desc)
                 prev_bottom = ln.bottom
                 continue
-            parsed = self._parse_numbers(nums)
+            parsed = (self._parse_by_roles(ln, anchors, rate) if anchors else None) or (
+                self._parse_numbers(nums)
+            )
             if parsed is None:
                 prev_bottom = ln.bottom
                 continue
             qty, unit, net, ok = parsed
             description = " ".join(pending_desc + ([desc] if desc else [])).strip()
             pending_desc = []
+            if not description and not rows and caption:
+                # désignation écrite au-dessus du tableau : « Hébergement 112 (du … au …) »
+                description, caption = caption, None
             if not description:
                 continue
             rows.append(
@@ -532,6 +623,12 @@ class RulesExtractor:
             m_rate = re.fullmatch(r"(\d{1,2}(?:[.,]\d{1,2})?)\s*%", text)
             if m_rate:
                 rate = parse_rate(text)
+                continue
+            m_vat = RX_VAT_IN_CELL.match(text)
+            if m_vat:  # montant de TVA unitaire et taux : on ne garde que le taux
+                rate = parse_rate(m_vat.group(1) + "%")
+                continue
+            if RX_DATE_CELL.match(text):  # date de prestation, pas une désignation
                 continue
             if re.fullmatch(r"[\d\s.,€]+(?:EUR)?", text) and re.search(r"\d", text):
                 nums.append(text)
@@ -587,6 +684,89 @@ class RulesExtractor:
                     return q.normalize(), unit, money(net), 1
         return Decimal(1), None, money(net), 0
 
+    @staticmethod
+    def _header_anchors(ln: Line) -> list[tuple[str, float]]:
+        """Rôle et position horizontale de chaque colonne, lus mot à mot dans l'en-tête.
+
+        On travaille au niveau du mot car l'OCR fusionne parfois deux en-têtes voisins
+        dans une même cellule (« PRIX TTC QUANTITÉ »).
+        """
+        words = sorted((w for s in ln.segments for w in s.words), key=lambda w: w.x0)
+        anchors: list[tuple[str, float]] = []
+        i = 0
+        while i < len(words):
+            t = fold(words[i].text).strip(".:")
+            nxt = fold(words[i + 1].text) if i + 1 < len(words) else ""
+            role, span = None, 1
+            if re.match(r"prix|p\.?u\b|tarif", t):
+                role = "unit_ttc" if nxt.startswith("ttc") else "unit_ht"
+                span = 2 if nxt.startswith(("ttc", "ht", "unit")) else 1
+            elif re.match(r"quantit|qte|qt\b", t):
+                role = "qty"
+            elif re.match(r"total|montant", t):
+                role = {"ttc": "total_ttc", "ht": "total_ht"}.get(nxt[:3].strip(), "total")
+                span = 2 if role != "total" else 1
+            elif t in ("tva", "taux"):
+                role = "vat"
+            if role:
+                last = words[i + span - 1]
+                anchors.append((role, (words[i].x0 + last.x1) / 2))
+            i += span
+        return anchors
+
+    @staticmethod
+    def _parse_by_roles(ln: Line, anchors: list[tuple[str, float]], rate: Decimal | None):
+        """Ligne d'un tableau à colonnes TTC : chaque nombre prend le rôle de la colonne la
+        plus proche. Le montant HT est recalculé (quantité × prix HT) et vérifié."""
+        cells: dict[str, Decimal] = {}
+        for seg in ln.segments:
+            text = seg.text.strip()
+            if is_ocr_noise(text, seg.conf) or RX_VAT_IN_CELL.match(text):
+                continue
+            if not (re.fullmatch(r"[\d\s.,€]+(?:EUR)?", text) and re.search(r"\d", text)):
+                continue
+            value = parse_amount(text)
+            if value is None:
+                continue
+            center = (seg.x0 + seg.x1) / 2
+            role = min(anchors, key=lambda a: abs(a[1] - center))[0]
+            cells.setdefault(role, value)
+        qty = cells.get("qty")
+        total = next((cells[r] for r in ("total", "total_ttc", "total_ht") if r in cells), None)
+        unit_ht, unit_ttc = cells.get("unit_ht"), cells.get("unit_ttc")
+        if qty is None or total is None:
+            return None
+        if (
+            unit_ht is not None
+            and money(qty * unit_ht) == money(total)
+            and "total_ttc" not in cells
+        ):
+            return qty, unit_ht, money(total), 1
+        if unit_ttc is not None and money(qty * unit_ttc) == money(total):  # total TTC
+            if unit_ht is None and rate:
+                unit_ht = money(unit_ttc * 100 / (100 + rate))
+            if unit_ht is not None and (
+                rate is None
+                or abs(money(unit_ht * (100 + rate) / 100) - unit_ttc) <= Decimal("0.01")
+            ):
+                return qty, unit_ht, money(qty * unit_ht), 1
+        return None
+
+    def _caption_above(self, header_idx: int) -> str | None:
+        """Désignation écrite juste au-dessus du tableau, quand le tableau n'en a pas."""
+        header = self.lines[header_idx]
+        for k in range(header_idx - 1, max(-1, header_idx - 4), -1):
+            ln = self.lines[k]
+            if header.top - ln.bottom > 60:
+                break
+            if len(ln.segments) != 1:
+                continue
+            seg = ln.segments[0]
+            text = seg.text.strip()
+            if len(text) >= 5 and any(c.islower() for c in text) and not self._is_label(seg):
+                return clean_ocr_text(text)
+        return None
+
     # ------------------------------------------------------------------ totaux
     def _amount_on_line(self, ln: Line, label_end: int | None = None) -> Decimal | None:
         """Montant le plus à droite de la ligne, hors taux de TVA."""
@@ -638,6 +818,39 @@ class RulesExtractor:
             if v is not None:
                 inv.amount_due = money(v)
                 break
+        if None in (inv.total_without_vat, inv.total_vat, inv.total_with_vat):
+            self._total_rows(inv, ex)
+
+    def _total_rows(self, inv: Invoice, ex: Extraction) -> None:
+        """Totaux sans libellé HT/TTC : ligne « Total » d'un récapitulatif de TVA, dont les
+        montants s'équilibrent (HT + TVA = TTC), ou « TOTAL » seul suivi d'un montant."""
+        lone_total = None
+        for ln in self.lines:
+            head = fold(ln.segments[0].text).strip(" :.")
+            if not re.fullmatch(r"total(?:\s*general)?", head):
+                continue
+            values = []
+            for seg in ln.segments[1:]:
+                text = re.sub(r"\d{1,2}(?:[.,]\d{1,2})?\s*%", " ", seg.text)
+                values += [parse_amount(m.group(0)) for m in AMOUNT_RE.finditer(text)]
+            values = [v for v in values if v is not None]
+            for k in range(len(values) - 2):
+                ht, tva, ttc = values[k : k + 3]
+                if ttc > 0 and money(ht + tva) == money(ttc):
+                    for field, value in (
+                        ("total_without_vat", ht),
+                        ("total_vat", tva),
+                        ("total_with_vat", ttc),
+                    ):
+                        if getattr(inv, field) is None:
+                            setattr(inv, field, money(value))
+                            ex.set(field, self._conf(0.9), "rules:total-row")
+                    return
+            if len(values) == 1 and lone_total is None:
+                lone_total = values[0]
+        if inv.total_with_vat is None and lone_total:
+            inv.total_with_vat = money(lone_total)
+            ex.set("total_with_vat", self._conf(0.75), "rules:total-alone")
 
     # ------------------------------------------------------------------ paiement, mentions
     def _payment_and_mentions(self, inv: Invoice, ex: Extraction) -> None:
@@ -707,7 +920,7 @@ class RulesExtractor:
         if inv.lines and inv.total_without_vat is None:
             inv.total_without_vat = money(sum(ln.net_amount or 0 for ln in inv.lines))
             ex.set("total_without_vat", self._conf(0.6), "rules:sum-lines")
-        if inv.total_with_vat is None and inv.amount_due is not None:
+        if inv.total_with_vat is None and inv.amount_due:  # un solde nul n'est pas un total
             inv.total_with_vat = inv.amount_due
             ex.set("total_with_vat", self._conf(0.7), "rules:from-due")
         if (
@@ -719,6 +932,20 @@ class RulesExtractor:
             ex.set("total_vat", self._conf(0.6), "rules:difference")
         if inv.amount_due is None:
             inv.amount_due = inv.total_with_vat
+        # un seul taux sur les lignes et des totaux cohérents avec lui : ventilation directe
+        rates = {ln.vat_rate for ln in inv.lines if ln.vat_rate is not None}
+        if (
+            not inv.vat_breakdown
+            and len(rates) == 1
+            and None not in (inv.total_without_vat, inv.total_vat)
+        ):
+            rate = rates.pop()
+            if abs(money(inv.total_without_vat * rate / 100) - inv.total_vat) <= Decimal("0.02"):
+                inv.vat_breakdown = [
+                    VatBreakdown(
+                        rate=rate, taxable_amount=inv.total_without_vat, tax_amount=inv.total_vat
+                    )
+                ]
         # bases imposables par taux, à partir des lignes
         if inv.vat_breakdown:
             by_rate: dict[Decimal, Decimal] = {}

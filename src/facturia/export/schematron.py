@@ -78,9 +78,11 @@ def run_schematrons(
     return ran, failures
 
 
-def check_xml(xml: bytes, schematron: bool = True) -> XmlReport:
+def check_xml(
+    xml: bytes, schematron: bool = True, which: tuple[str, ...] = ("en16931", "br-fr")
+) -> XmlReport:
     ok, err = check_xsd(xml)
     report = XmlReport(xsd_valid=ok, xsd_error=err)
     if schematron and saxon_available():
-        report.schematron_run, report.failures = run_schematrons(xml)
+        report.schematron_run, report.failures = run_schematrons(xml, which)
     return report
